@@ -182,13 +182,15 @@ const App: React.FC = () => {
           </div>
         ) : (
           <>
-            {/* Camada 2: Verificação de Idade Obrigatória (Após carregamento) */}
-            {!isAgeVerified && currentView !== 'admin' && currentView !== 'login' ? (
-              <AgeVerificationPopup onVerify={handleAgeVerify} isDarkMode={isDarkMode} />
-            ) : (
-              <>
-                {/* Camada 3: Conteúdo Real */}
-                <header className={`h-16 backdrop-blur-xl border-b flex items-center px-4 sticky top-0 z-50 transition-colors ${theme.bgHeader}`}>
+            {/* Camada 2: Conteúdo Real (Sempre visível) */}
+            <>
+              {/* Camada 3: Popup de Verificação de Idade (Overlay não-bloqueante) */}
+              {!isAgeVerified && currentView !== 'admin' && currentView !== 'login' && (
+                <AgeVerificationPopup onVerify={handleAgeVerify} isDarkMode={isDarkMode} />
+              )}
+              
+              {/* Conteúdo Principal */}
+              <header className={`h-16 backdrop-blur-xl border-b flex items-center px-4 sticky top-0 z-50 transition-colors ${theme.bgHeader}`}>
                   <div className="absolute left-4 z-10">
                     {currentView !== 'home' && (
                       <button 
@@ -296,7 +298,6 @@ const App: React.FC = () => {
                   />
                 )}
               </>
-            )}
           </>
         )}
       </div>
