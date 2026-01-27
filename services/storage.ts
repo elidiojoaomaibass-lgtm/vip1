@@ -323,7 +323,7 @@ export const storageService = {
       const { error } = await supabase.from('promos').upsert(payload);
       if (error) {
         console.error("Erro ao salvar Promo Top no Supabase:", error);
-        return { synced: false, error: error.message };
+        return { synced: false, error: JSON.stringify(error) };
       }
       return { synced: true };
     }
@@ -360,7 +360,7 @@ export const storageService = {
       const { error } = await supabase.from('promos').upsert(payload);
       if (error) {
         console.error("Erro ao salvar Promo Bottom no Supabase:", error);
-        return { synced: false, error: error.message };
+        return { synced: false, error: JSON.stringify(error) };
       }
       return { synced: true };
     }
