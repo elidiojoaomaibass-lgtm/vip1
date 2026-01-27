@@ -170,7 +170,8 @@ export const AdminView: React.FC<Props> = ({
 
     } else if (tab === 'videos') {
       if (!formVideo.coverUrl) return;
-      const validPreviews = (formVideo.previews || []).filter(url => url.trim() !== '');
+      // Filter safe strings only
+      const validPreviews = (formVideo.previews || []).filter(url => typeof url === 'string' && url.trim() !== '');
       let newVideos;
       if (editingId) newVideos = videos.map(v => v.id === editingId ? { ...v, ...formVideo, previews: validPreviews } as VideoCard : v);
       else newVideos = [...videos, { id: Date.now().toString(), title: formVideo.title || 'Premium Video', coverUrl: formVideo.coverUrl!, previews: validPreviews, buyLink: formVideo.buyLink || '', buyButtonText: formVideo.buyButtonText || 'BUY ALL PACK', telegramLink: formVideo.telegramLink || '', telegramButtonText: formVideo.telegramButtonText || 'DM TELEGRAM' }];
@@ -204,7 +205,19 @@ export const AdminView: React.FC<Props> = ({
   };
 
   const startEditBanner = (b: Banner) => { setEditingId(b.id); setFormBanner({...b}); setTab('banners'); setShowAddModal(true); };
-  const startEditVideo = (v: VideoCard) => { setEditingId(v.id); const pre = [...(v.previews || [''])]; setFormVideo({...v, previews: pre}); setTab('videos'); setShowAddModal(true); };
+  const startEditVideo = (v: VideoCard) => { 
+    setEditingId(v.id); 
+    // Ensure always 3 slots for inputs
+    const current = v.previews || [];
+    const safePreviews = [
+      current[0] || '',
+      current[1] || '',
+      current[2] || ''
+    ];
+    setFormVideo({...v, previews: safePreviews}); 
+    setTab('videos'); 
+    setShowAddModal(true); 
+  };
   const startEditNotice = (n: Notice) => { setEditingId(n.id); setFormNotice({...n}); setTab('notices'); setShowAddModal(true); };
 
   const navItems: { id: 'banners' | 'videos' | 'notices' | 'promo'; label: string; icon: any; count?: number }[] = [
@@ -307,6 +320,28 @@ const PromoSection = ({ title, data, onSave, icon: Icon, isDarkMode }: { title: 
   );
 };
 
+  const handleNewItem = () => {
+    setEditingId(null);
+    // Explicitly reset forms based on current tab to ensure clean state
+    if (tab === 'banners') {
+      setFormBanner({ imageUrl: '', buttonText: 'Saiba Mais', link: '', type: 'image' });
+    } else if (tab === 'videos') {
+      // Initialize with 3 empty slots for safety
+      setFormVideo({ 
+        title: '', 
+        coverUrl: '', 
+        previews: ['', '', ''], 
+        buyLink: '', 
+        buyButtonText: 'BUY ALL PACK', 
+        telegramLink: '', 
+        telegramButtonText: 'DM TELEGRAM' 
+      });
+    } else if (tab === 'notices') {
+      setFormNotice({ title: '', content: '', date: new Date().toLocaleDateString('pt-BR') });
+    }
+    setShowAddModal(true);
+  };
+
   return (
     <div className="flex min-h-[calc(100vh-64px)] animate-in fade-in duration-700">
       {/* Sidebar */}
@@ -368,7 +403,7 @@ const PromoSection = ({ title, data, onSave, icon: Icon, isDarkMode }: { title: 
           </div>
           {tab !== 'promo' && (
             <button 
-              onClick={() => setShowAddModal(true)} 
+              onClick={handleNewItem} 
               className="flex items-center gap-3 bg-violet-600 text-white px-6 py-4 rounded-xl text-[10px] font-black shadow-2xl shadow-violet-600/30 active:scale-95 transition-all hover:bg-violet-500"
             >
               <Plus size={18} /> NOVO ITEM
@@ -430,7 +465,7 @@ const PromoSection = ({ title, data, onSave, icon: Icon, isDarkMode }: { title: 
                 </div>
               </div>
               <h4 className={`text-sm font-black uppercase ${isDarkMode ? 'text-white' : 'text-zinc-900'}`}>{v.title || 'Untitled Pack'}</h4>
-              <p className="text-[10px] text-zinc-500 font-bold mt-1 uppercase tracking-widest">{v.previews.length} Vídeo de Preview</p>
+              <p className="text-[10px] text-zinc-500 font-bold mt-1 uppercase tracking-widest">{(v.previews || []).length} Vídeo de Preview</p>
             </div>
           ))}
 
