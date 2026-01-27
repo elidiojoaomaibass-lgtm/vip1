@@ -157,7 +157,7 @@ export const AdminView: React.FC<Props> = ({
   };
 
   const handleSave = async () => {
-    let result: { synced: boolean } = { synced: false };
+    let result: { synced: boolean; error?: string } = { synced: false };
 
     if (tab === 'banners') {
       if (!formBanner.imageUrl) return;
@@ -191,7 +191,7 @@ export const AdminView: React.FC<Props> = ({
     closeModal();
 
     if (!result.synced) {
-      alert("⚠️ ATENÇÃO: Os dados foram salvos APENAS NO SEU NAVEGADOR porque a conexão com o banco de dados falhou ou não está configurada.\n\nOutros usuários NÃO verão essas alterações até que o problema de conexão seja resolvido.");
+      alert(`⚠️ ATENÇÃO: Os dados foram salvos APENAS NO SEU NAVEGADOR.\n\nMotivo do erro: ${result.error || 'Erro desconhecido de conexão'}\n\nOutros usuários NÃO verão essas alterações até que isso seja resolvido.`);
     }
   };
 
@@ -241,7 +241,7 @@ const PromoSection = ({ title, data, onSave, icon: Icon, isDarkMode }: { title: 
     }
     
     if (result && !result.synced) {
-      alert("⚠️ Salvo apenas localmente (Offline)");
+      alert(`⚠️ Salvo apenas localmente (Offline).\nErro: ${result.error || 'Desconhecido'}`);
     }
     
     setIsDirty(false);

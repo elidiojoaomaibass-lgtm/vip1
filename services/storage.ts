@@ -43,9 +43,9 @@ const safeSaveLocal = (key: string, data: any) => {
 
 const mapBannerToDb = (b: Banner, index: number) => ({
   id: b.id,
-  image_url: b.imageUrl,
-  link: b.link,
-  button_text: b.buttonText,
+  image_url: b.imageUrl || '',
+  link: b.link || '',
+  button_text: b.buttonText || '',
   type: b.type || 'image',
   sort_order: index,
   updated_at: new Date().toISOString()
@@ -59,15 +59,18 @@ const mapBannerFromDb = (b: any): Banner => ({
   type: b.type
 });
 
+/**
+ * Converte Video para formato DB (Snake Cased)
+ */
 const mapVideoToDb = (v: VideoCard, index: number) => ({
   id: v.id,
-  title: v.title,
-  cover_url: v.coverUrl,
-  previews: v.previews,
-  buy_link: v.buyLink,
-  buy_button_text: v.buyButtonText,
-  telegram_link: v.telegramLink,
-  telegram_button_text: v.telegramButtonText,
+  title: v.title || '',
+  cover_url: v.coverUrl || '',
+  previews: v.previews || [],
+  buy_link: v.buyLink || '',
+  buy_button_text: v.buyButtonText || '',
+  telegram_link: v.telegramLink || '',
+  telegram_button_text: v.telegramButtonText || '',
   sort_order: index,
   updated_at: new Date().toISOString()
 });
@@ -83,11 +86,14 @@ const mapVideoFromDb = (v: any): VideoCard => ({
   telegramButtonText: v.telegram_button_text
 });
 
+/**
+ * Converte Notice para formato DB (Snake Cased)
+ */
 const mapNoticeToDb = (n: Notice, index: number) => ({
   id: n.id,
-  title: n.title,
-  content: n.content,
-  date: n.date,
+  title: n.title || '',
+  content: n.content || '',
+  date: n.date || '',
   sort_order: index,
   updated_at: new Date().toISOString()
 });
@@ -100,13 +106,16 @@ const mapNoticeFromDb = (n: any): Notice => ({
   sort_order: n.sort_order
 });
 
+/**
+ * Converte Promo para formato DB (Snake Cased)
+ */
 const mapPromoToDb = (p: PromoCard, id: string) => ({
   id: id,
-  title: p.title,
-  description: p.description,
-  button_text: p.buttonText,
-  button_link: p.buttonLink,
-  is_active: p.isActive,
+  title: p.title || '',
+  description: p.description || '',
+  button_text: p.buttonText || '',
+  button_link: p.buttonLink || '',
+  is_active: p.isActive || false,
   updated_at: new Date().toISOString()
 });
 
@@ -135,36 +144,50 @@ export const storageService = {
     return data ? JSON.parse(data) : DEFAULT_BANNERS;
   },
 
-  saveBanners: async (banners: Banner[]): Promise<{ synced: boolean }> => {
+  saveBanners: async (banners: Banner[]): Promise<{ synced: boolean; error?: string }> => {
+    // Salvar localmente como backup/otimização
     safeSaveLocal(BANNERS_KEY, banners);
     
     if (supabase) {
       try {
-        const { data: existing } = await supabase.from('banners').select('id');
+        // Buscar IDs existentes para limpar deletados
+        const { data: existing, error: fetchError } = await supabase.from('banners').select('id');
+        if (fetchError) {
+           console.error("Error fetching banners:", fetchError);
+           return { synced: false, error: fetchError.message };
+        }
         const existingIds = existing?.map(b => b.id) || [];
         
+        // UPSERT todos os banners mapeados
         const payload = banners.map((b, idx) => mapBannerToDb(b, idx));
         
         if (payload.length > 0) {
-          const { error } = await supabase.from('banners').upsert(payload, { onConflict: 'id' });
+          const { error } = await supabase.from('banners').upsert(payload, {
+            onConflict: 'id'
+          });
           if (error) {
              console.error("Error upserting banners:", error);
-             return { synced: false };
+             return { synced: false, error: error.message };
           }
         }
         
+        // Deletar banners removidos
         const currentIds = banners.map(b => b.id);
         const toDelete = existingIds.filter(id => !currentIds.includes(id));
         if (toDelete.length > 0) {
-          await supabase.from('banners').delete().in('id', toDelete);
+          const { error: deleteError } = await supabase.from('banners').delete().in('id', toDelete);
+          if (deleteError) {
+             console.error("Error deleting banners:", deleteError);
+             return { synced: false, error: deleteError.message };
+          }
         }
         return { synced: true };
-      } catch (err) {
+      } catch (err: any) {
         console.error("Error saving banners:", err);
-        return { synced: false };
+        return { synced: false, error: err.message || 'Unknown error' };
       }
     }
-    return { synced: false };
+    return { synced: false, error: 'Supabase client not initialized' };
   },
 
   // ========== VIDEOS ==========
@@ -183,12 +206,14 @@ export const storageService = {
     return data ? JSON.parse(data) : DEFAULT_VIDEOS;
   },
 
-  saveVideos: async (videos: VideoCard[]): Promise<{ synced: boolean }> => {
+  saveVideos: async (videos: VideoCard[]): Promise<{ synced: boolean; error?: string }> => {
     safeSaveLocal(VIDEOS_KEY, videos);
     
     if (supabase) {
       try {
-        const { data: existing } = await supabase.from('videos').select('id');
+        const { data: existing, error: fetchError } = await supabase.from('videos').select('id');
+        if (fetchError) return { synced: false, error: fetchError.message };
+
         const existingIds = existing?.map(v => v.id) || [];
         
         const payload = videos.map((v, idx) => mapVideoToDb(v, idx));
@@ -197,22 +222,23 @@ export const storageService = {
            const { error } = await supabase.from('videos').upsert(payload, { onConflict: 'id' });
            if (error) {
               console.error("Error upserting videos:", error);
-              return { synced: false };
+              return { synced: false, error: error.message };
            }
         }
 
         const currentIds = videos.map(v => v.id);
         const toDelete = existingIds.filter(id => !currentIds.includes(id));
         if (toDelete.length > 0) {
-          await supabase.from('videos').delete().in('id', toDelete);
+          const { error: deleteError } = await supabase.from('videos').delete().in('id', toDelete);
+          if (deleteError) return { synced: false, error: deleteError.message };
         }
         return { synced: true };
-      } catch (err) {
+      } catch (err: any) {
         console.error("Error saving videos:", err);
-        return { synced: false };
+        return { synced: false, error: err.message || 'Unknown error' };
       }
     }
-    return { synced: false };
+    return { synced: false, error: 'Supabase client not initialized' };
   },
 
   // ========== NOTICES ==========
@@ -231,12 +257,14 @@ export const storageService = {
     return data ? JSON.parse(data) : DEFAULT_NOTICES;
   },
 
-  saveNotices: async (notices: Notice[]): Promise<{ synced: boolean }> => {
+  saveNotices: async (notices: Notice[]): Promise<{ synced: boolean; error?: string }> => {
     safeSaveLocal(NOTICES_KEY, notices);
     
     if (supabase) {
       try {
-        const { data: existing } = await supabase.from('notices').select('id');
+        const { data: existing, error: fetchError } = await supabase.from('notices').select('id');
+        if (fetchError) return { synced: false, error: fetchError.message };
+
         const existingIds = existing?.map(n => n.id) || [];
         
         const payload = notices.map((n, idx) => mapNoticeToDb(n, idx));
@@ -245,22 +273,23 @@ export const storageService = {
           const { error } = await supabase.from('notices').upsert(payload, { onConflict: 'id' });
           if (error) {
              console.error("Error upserting notices:", error);
-             return { synced: false };
+             return { synced: false, error: error.message };
           }
         }
         
         const currentIds = notices.map(n => n.id);
         const toDelete = existingIds.filter(id => !currentIds.includes(id));
         if (toDelete.length > 0) {
-          await supabase.from('notices').delete().in('id', toDelete);
+          const { error: deleteError } = await supabase.from('notices').delete().in('id', toDelete);
+          if (deleteError) return { synced: false, error: deleteError.message };
         }
         return { synced: true };
-      } catch (err) {
+      } catch (err: any) {
         console.error("Error saving notices:", err);
-        return { synced: false };
+        return { synced: false, error: err.message || 'Unknown error' };
       }
     }
-    return { synced: false };
+    return { synced: false, error: 'Supabase client not initialized' };
   },
 
   // ========== PROMO CARDS ==========
@@ -287,18 +316,18 @@ export const storageService = {
     return DEFAULT_PROMO;
   },
 
-  savePromoCard: async (promo: PromoCard): Promise<{ synced: boolean }> => {
+  savePromoCard: async (promo: PromoCard): Promise<{ synced: boolean; error?: string }> => {
     safeSaveLocal(PROMO_KEY, promo);
     if (supabase) {
       const payload = mapPromoToDb(promo, 'top');
       const { error } = await supabase.from('promos').upsert(payload);
       if (error) {
         console.error("Erro ao salvar Promo Top no Supabase:", error);
-        return { synced: false };
+        return { synced: false, error: error.message };
       }
       return { synced: true };
     }
-    return { synced: false };
+    return { synced: false, error: 'Supabase client not initialized' };
   },
 
   getBottomPromoCard: async (): Promise<PromoCard> => {
@@ -324,18 +353,18 @@ export const storageService = {
     return DEFAULT_BOTTOM_PROMO;
   },
 
-  saveBottomPromoCard: async (promo: PromoCard): Promise<{ synced: boolean }> => {
+  saveBottomPromoCard: async (promo: PromoCard): Promise<{ synced: boolean; error?: string }> => {
     safeSaveLocal(BOTTOM_PROMO_KEY, promo);
     if (supabase) {
       const payload = mapPromoToDb(promo, 'bottom');
       const { error } = await supabase.from('promos').upsert(payload);
       if (error) {
         console.error("Erro ao salvar Promo Bottom no Supabase:", error);
-        return { synced: false };
+        return { synced: false, error: error.message };
       }
       return { synced: true };
     }
-    return { synced: false };
+    return { synced: false, error: 'Supabase client not initialized' };
   },
   // ========== DELETE METHODS ==========
   deleteBanner: async (id: string) => {
