@@ -174,7 +174,7 @@ const App: React.FC = () => {
                   
                   <div className="flex-1 flex justify-center items-center h-full">
                     <h1 className={`${theme.textPrimary} font-black tracking-tighter text-xl leading-tight uppercase italic`}>
-                      {currentView === 'home' ? 'HOTHUB' : currentView === 'admin' ? 'ADMIN DASHBOARD' : currentView === 'login' ? 'SECURE LOGIN' : 'DETAILS'}
+                      {currentView === 'home' ? 'OnlyHub' : currentView === 'admin' ? 'ADMIN DASHBOARD' : currentView === 'login' ? 'SECURE LOGIN' : 'DETAILS'}
                     </h1>
                   </div>
                   
@@ -251,10 +251,10 @@ const App: React.FC = () => {
                         className="flex items-center justify-center gap-1.5 cursor-pointer select-none active:opacity-60 transition-opacity group"
                         onClick={goToAdmin}
                       >
-                        <span className="text-[9px] font-bold text-violet-500 uppercase tracking-widest">Administrative Dashboard Access</span>
+                        <span className="text-[9px] font-bold text-violet-500 uppercase tracking-widest">Exclusive content for adults 18+</span>
                       </div>
                       <p className={`text-[8px] font-medium tracking-tight ${isDarkMode ? 'text-zinc-600' : 'text-zinc-400'}`}>
-                        © 2025 HotHub. All rights reserved.
+                        © 2025 OnlyHub. All rights reserved.
                       </p>
                     </footer>
                   )}
