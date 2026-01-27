@@ -3,6 +3,7 @@ import React, { useState } from 'react';
 import { Banner, VideoCard, PromoCard, Notice } from '../types';
 import { storageService as storageUploadService } from '../services/storageUpload';
 import { storageService } from '../services/storage';
+import { checkConnection, isSupabaseConfigured } from '../services/supabase';
 import { 
   Plus, 
   Trash2, 
@@ -49,6 +50,19 @@ export const AdminView: React.FC<Props> = ({
   const [showAddModal, setShowAddModal] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [isUploading, setIsUploading] = useState(false);
+  const [connectionStatus, setConnectionStatus] = useState<'checking' | 'connected' | 'offline'>('checking');
+
+  React.useEffect(() => {
+    const check = async () => {
+      if (!isSupabaseConfigured) {
+        setConnectionStatus('offline');
+        return;
+      }
+      const isConnected = await checkConnection();
+      setConnectionStatus(isConnected ? 'connected' : 'offline');
+    };
+    check();
+  }, []);
 
   const [formBanner, setFormBanner] = useState<Partial<Banner>>({ 
     imageUrl: '', buttonText: 'Saiba Mais', link: '', type: 'image'
@@ -268,6 +282,16 @@ const PromoSection = ({ title, data, onSave, icon: Icon, isDarkMode }: { title: 
         <div className="mb-8 flex flex-col gap-1 px-4">
           <span className="text-[10px] font-black text-zinc-500 uppercase tracking-[0.2em] italic">Gerenciamento</span>
         </div>
+        
+        <div className={`mx-4 mb-6 p-3 rounded-xl border flex items-center gap-3 ${connectionStatus === 'connected' ? 'bg-emerald-500/10 border-emerald-500/20' : 'bg-red-500/10 border-red-500/20'}`}>
+          <div className={`w-2 h-2 rounded-full ${connectionStatus === 'connected' ? 'bg-emerald-500 shadow-[0_0_10px_rgba(16,185,129,0.5)]' : 'bg-red-500 animate-pulse'}`} />
+          <div className="flex flex-col">
+             <span className={`text-[9px] font-black uppercase tracking-widest ${isDarkMode ? 'text-zinc-300' : 'text-zinc-600'}`}>
+               {connectionStatus === 'checking' ? 'VERIFICANDO...' : connectionStatus === 'connected' ? 'ONLINE (SYNC)' : 'OFFLINE (LOCAL)'}
+             </span>
+             {connectionStatus === 'offline' && <span className="text-[8px] text-red-500 font-bold">Verifique .env na Vercel</span>}
+          </div>
+        </div>
         {navItems.map((item) => (
           <button 
             key={item.id}
@@ -287,6 +311,13 @@ const PromoSection = ({ title, data, onSave, icon: Icon, isDarkMode }: { title: 
 
       {/* Main Content Area */}
       <div className={`flex-1 p-4 md:p-10 space-y-8 transition-colors ${isDarkMode ? 'bg-zinc-900/10' : 'bg-zinc-100/30'}`}>
+        <div className={`md:hidden flex items-center gap-2 mb-4 px-2`}>
+           <div className={`w-2 h-2 rounded-full ${connectionStatus === 'connected' ? 'bg-emerald-500' : 'bg-red-500'}`} />
+           <span className="text-[9px] font-black uppercase tracking-widest text-zinc-500">
+             {connectionStatus === 'connected' ? 'ONLINE SYNC' : 'OFFLINE MODE'}
+           </span>
+        </div>
+
         <div className={`md:hidden flex p-1 rounded-xl border transition-colors ${isDarkMode ? 'bg-zinc-800/50 border-zinc-800' : 'bg-white border-zinc-200 shadow-sm'} mb-4`}>
           {navItems.map((item) => (
             <button key={item.id} onClick={() => setTab(item.id)} className={`flex-1 py-3 flex items-center justify-center rounded-xl transition-all ${tab === item.id ? 'bg-violet-600 text-white' : isDarkMode ? 'text-zinc-500' : 'text-zinc-400'}`}>

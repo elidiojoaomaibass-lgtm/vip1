@@ -156,22 +156,7 @@ interface Props {
   isLoading?: boolean;
 }
 
-const SkeletonItem: React.FC<{ isDarkMode: boolean }> = ({ isDarkMode }) => (
-  <div className={`p-4 rounded-3xl border ${isDarkMode ? 'bg-zinc-900/40 border-zinc-800' : 'bg-white border-zinc-100 shadow-sm'}`}>
-    <div className={`aspect-video rounded-2xl animate-pulse ${isDarkMode ? 'bg-zinc-800' : 'bg-zinc-200'}`} />
-    <div className="mt-4 space-y-3">
-      <div className={`h-4 w-3/4 rounded animate-pulse ${isDarkMode ? 'bg-zinc-800' : 'bg-zinc-200'}`} />
-      <div className="flex gap-4">
-        <div className={`h-3 w-16 rounded animate-pulse ${isDarkMode ? 'bg-zinc-800' : 'bg-zinc-200'}`} />
-        <div className={`h-3 w-16 rounded animate-pulse ${isDarkMode ? 'bg-zinc-800' : 'bg-zinc-200'}`} />
-      </div>
-      <div className="flex gap-2 pt-2">
-        <div className={`h-12 flex-1 rounded-2xl animate-pulse ${isDarkMode ? 'bg-zinc-800' : 'bg-zinc-200'}`} />
-        <div className={`h-12 flex-1 rounded-2xl animate-pulse ${isDarkMode ? 'bg-zinc-800' : 'bg-zinc-200'}`} />
-      </div>
-    </div>
-  </div>
-);
+
 
 export const HomeView: React.FC<Props> = ({ 
   banners, 
@@ -208,18 +193,7 @@ export const HomeView: React.FC<Props> = ({
 
   const validBanners = (banners || []).filter(b => b.imageUrl);
 
-  if (isLoading) {
-    return (
-      <div className="space-y-6 p-4">
-        <div className={`aspect-video w-full rounded-3xl animate-pulse ${isDarkMode ? 'bg-zinc-800' : 'bg-zinc-200'}`} />
-        <div className={`h-36 w-full rounded-3xl animate-pulse ${isDarkMode ? 'bg-zinc-800/60' : 'bg-zinc-200/60'}`} />
-        <div className="space-y-6 pt-2">
-          <SkeletonItem isDarkMode={isDarkMode} />
-          <SkeletonItem isDarkMode={isDarkMode} />
-        </div>
-      </div>
-    );
-  }
+
 
   return (
     <div className="space-y-6 animate-in fade-in duration-500">

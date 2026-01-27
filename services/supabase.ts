@@ -16,3 +16,14 @@ if (!supabase) {
 } else {
   console.log("✅ Supabase conectado:", supabaseUrl);
 }
+export const isSupabaseConfigured = !!supabase;
+
+export const checkConnection = async () => {
+  if (!supabase) return false;
+  try {
+    const { error } = await supabase.from('banners').select('id').limit(1);
+    return !error;
+  } catch (e) {
+    return false;
+  }
+};

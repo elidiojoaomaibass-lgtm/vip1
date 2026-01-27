@@ -317,6 +317,49 @@ export const storageService = {
       if (error) console.error("Erro ao salvar Promo Bottom no Supabase:", error);
     }
   },
+  // ========== DELETE METHODS ==========
+  deleteBanner: async (id: string) => {
+    if (supabase) {
+      const { error } = await supabase.from('banners').delete().eq('id', id);
+      if (error) console.error("Error deleting banner:", error);
+    }
+    // Also remove from local storage
+    try {
+      const stored = localStorage.getItem(BANNERS_KEY);
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        safeSaveLocal(BANNERS_KEY, parsed.filter((b: any) => b.id !== id));
+      }
+    } catch(e) {}
+  },
+
+  deleteVideo: async (id: string) => {
+    if (supabase) {
+      const { error } = await supabase.from('videos').delete().eq('id', id);
+      if (error) console.error("Error deleting video:", error);
+    }
+    try {
+      const stored = localStorage.getItem(VIDEOS_KEY);
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        safeSaveLocal(VIDEOS_KEY, parsed.filter((v: any) => v.id !== id));
+      }
+    } catch(e) {}
+  },
+
+  deleteNotice: async (id: string) => {
+    if (supabase) {
+      const { error } = await supabase.from('notices').delete().eq('id', id);
+      if (error) console.error("Error deleting notice:", error);
+    }
+    try {
+      const stored = localStorage.getItem(NOTICES_KEY);
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        safeSaveLocal(NOTICES_KEY, parsed.filter((n: any) => n.id !== id));
+      }
+    } catch(e) {}
+  },
 
   // ========== REALTIME SYNC ==========
   subscribeToChanges: (callbacks: {

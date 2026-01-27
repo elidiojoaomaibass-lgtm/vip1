@@ -60,11 +60,10 @@ const App: React.FC = () => {
         setPromoCard(pTop);
         setBottomPromoCard(pBottom);
         setNotices(n);
+      } catch (error) {
+        console.error("Error loading data:", error);
       } finally {
-        // Reduzir delay para produção
-        setTimeout(() => {
-          setIsLoadingData(false);
-        }, 500);
+        setIsLoadingData(false);
       }
     };
     initData();
@@ -156,22 +155,8 @@ const App: React.FC = () => {
       <div className={`w-full ${currentView === 'admin' ? 'max-w-6xl' : 'max-w-md'} ${theme.bgFrame} min-h-screen flex flex-col relative overflow-hidden shadow-[0_0_100px_rgba(0,0,0,0.1)] ${isDarkMode ? 'border-zinc-800/50' : 'border-zinc-200/50'} border-x transition-all duration-500`}>
         
         {/* Camada 1: Carregamento Esqueleto (Sempre primeiro) */}
-        {isLoadingData ? (
-          <div className="flex flex-col h-full">
-            <header className={`h-16 border-b flex items-center px-4 animate-pulse ${theme.bgHeader}`}>
-              <div className="w-32 h-6 bg-zinc-200 dark:bg-zinc-800 rounded-lg mx-auto" />
-            </header>
-            <main className="p-4 space-y-6">
-              <div className="w-full aspect-video rounded-3xl bg-zinc-200 dark:bg-zinc-800 animate-pulse" />
-              <div className="h-32 w-full rounded-3xl bg-zinc-200 dark:bg-zinc-800 animate-pulse" />
-              <div className="space-y-4">
-                <div className="w-full aspect-video rounded-3xl bg-zinc-200 dark:bg-zinc-800 animate-pulse" />
-                <div className="w-full aspect-video rounded-3xl bg-zinc-200 dark:bg-zinc-800 animate-pulse" />
-              </div>
-            </main>
-          </div>
-        ) : (
-          <>
+            {/* Conteúdo Principal */}
+            <>
             {/* Conteúdo Principal */}
             <>
               {/* Conteúdo Principal */}
@@ -282,8 +267,7 @@ const App: React.FC = () => {
                   />
                 )}
               </>
-          </>
-        )}
+            </>
       </div>
     </div>
   );
