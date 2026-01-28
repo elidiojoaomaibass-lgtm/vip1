@@ -6,26 +6,26 @@ export interface UploadResult {
   path?: string;
 }
 
-export const storageService = {
+export const uploadService = {
   /**
    * Upload de imagem para bucket de banners
    */
   uploadBannerImage: async (file: File): Promise<UploadResult> => {
-    return storageService.uploadFile(file, 'banners');
+    return uploadService.uploadFile(file, 'banners');
   },
 
   /**
    * Upload de capa de vídeo
    */
   uploadVideoCover: async (file: File): Promise<UploadResult> => {
-    return storageService.uploadFile(file, 'video-covers');
+    return uploadService.uploadFile(file, 'video-covers');
   },
 
   /**
    * Upload de vídeo de preview
    */
   uploadVideoPreview: async (file: File): Promise<UploadResult> => {
-    return storageService.uploadFile(file, 'video-previews');
+    return uploadService.uploadFile(file, 'video-previews');
   },
 
   /**
@@ -96,25 +96,49 @@ export const storageService = {
   },
 
   /**
+   * Deletar por URL (Tenta extrair bucket e path)
+   */
+  deleteFileByUrl: async (url: string): Promise<{ error: string | null }> => {
+    if (!supabase || !url || !url.includes('supabase.co/storage')) {
+      return { error: null }; // Ignora se não for URL do Supabase
+    }
+
+    try {
+      // Formato esperado: .../public/BUCKET_NAME/FILE_PATH
+      const parts = url.split('/public/');
+      if (parts.length < 2) return { error: null };
+
+      const pathParts = parts[1].split('/');
+      const bucket = pathParts[0];
+      const filePath = pathParts.slice(1).join('/');
+
+      return await uploadService.deleteFile(bucket, filePath);
+    } catch (err: any) {
+      console.error('Error deleting by URL:', err);
+      return { error: err.message };
+    }
+  },
+
+  /**
    * Obter URL otimizada de imagem com transformação
    * (redimensionamento automático)
    */
   getOptimizedImageUrl: (url: string, width?: number, height?: number): string => {
     if (!url) return '';
-    
+
     // Se já é uma URL do Supabase Storage
     if (url.includes('supabase.co/storage')) {
       const params = [];
       if (width) params.push(`width=${width}`);
       if (height) params.push(`height=${height}`);
       params.push('quality=80');
-      
+
       if (params.length > 0) {
         const separator = url.includes('?') ? '&' : '?';
         return `${url}${separator}${params.join('&')}`;
       }
     }
-    
+
     return url;
   },
 
@@ -150,7 +174,7 @@ export const storageService = {
    */
   validateImage: (file: File): { valid: boolean; error: string | null } => {
     // Validar tipo
-    const typeValidation = storageService.validateFileType(file, [
+    const typeValidation = uploadService.validateFileType(file, [
       'image/jpeg',
       'image/png',
       'image/webp',
@@ -159,7 +183,7 @@ export const storageService = {
     if (!typeValidation.valid) return typeValidation;
 
     // Validar tamanho (10MB)
-    return storageService.validateFileSize(file, 10);
+    return uploadService.validateFileSize(file, 10);
   },
 
   /**
@@ -167,7 +191,7 @@ export const storageService = {
    */
   validateVideo: (file: File): { valid: boolean; error: string | null } => {
     // Validar tipo
-    const typeValidation = storageService.validateFileType(file, [
+    const typeValidation = uploadService.validateFileType(file, [
       'video/mp4',
       'video/webm',
       'video/quicktime' // Suporte para .mov (iPhone/Mac)
@@ -175,6 +199,6 @@ export const storageService = {
     if (!typeValidation.valid) return typeValidation;
 
     // Validar tamanho (100MB)
-    return storageService.validateFileSize(file, 100);
+    return uploadService.validateFileSize(file, 100);
   }
 };

@@ -1,6 +1,7 @@
 
 import { Banner, VideoCard, PromoCard, Notice } from '../types';
 import { supabase } from './supabase';
+import { uploadService } from './storageUpload';
 
 const BANNERS_KEY = 'vh_banners';
 const VIDEOS_KEY = 'vh_videos';
@@ -40,6 +41,28 @@ const safeSaveLocal = (key: string, data: any) => {
 // ==========================================
 // HELPERS DE MAPEAMENTO (CamelCase <-> SnakeCase)
 // ==========================================
+
+const isUuid = (id: string) => {
+  const regex = /^[0-9a-f]{8}-[0-9a-f]{4}-[4][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+  // Simplificado para aceitar qualquer v4 UUID ou similar
+  const simpleRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  return simpleRegex.test(id);
+};
+
+const fixIds = (items: any[], storageKey: string) => {
+  let changed = false;
+  const fixed = items.map(item => {
+    if (!item.id || !isUuid(item.id)) {
+      changed = true;
+      return { ...item, id: crypto.randomUUID() };
+    }
+    return item;
+  });
+  if (changed) {
+    safeSaveLocal(storageKey, fixed);
+  }
+  return fixed;
+};
 
 const mapBannerToDb = (b: Banner, index: number) => ({
   id: b.id,
@@ -135,50 +158,51 @@ export const storageService = {
         .from('banners')
         .select('*')
         .order('sort_order', { ascending: true });
-        
+
       if (!error && data) {
         return data.map(mapBannerFromDb);
       }
     }
     const data = localStorage.getItem(BANNERS_KEY);
-    return data ? JSON.parse(data) : DEFAULT_BANNERS;
+    const banners = data ? JSON.parse(data) : DEFAULT_BANNERS;
+    return fixIds(banners, BANNERS_KEY);
   },
 
   saveBanners: async (banners: Banner[]): Promise<{ synced: boolean; error?: string }> => {
     // Salvar localmente como backup/otimização
     safeSaveLocal(BANNERS_KEY, banners);
-    
+
     if (supabase) {
       try {
         // Buscar IDs existentes para limpar deletados
         const { data: existing, error: fetchError } = await supabase.from('banners').select('id');
         if (fetchError) {
-           console.error("Error fetching banners:", fetchError);
-           return { synced: false, error: fetchError.message };
+          console.error("Error fetching banners:", fetchError);
+          return { synced: false, error: fetchError.message };
         }
         const existingIds = existing?.map(b => b.id) || [];
-        
+
         // UPSERT todos os banners mapeados
         const payload = banners.map((b, idx) => mapBannerToDb(b, idx));
-        
+
         if (payload.length > 0) {
           const { error } = await supabase.from('banners').upsert(payload, {
             onConflict: 'id'
           });
           if (error) {
-             console.error("Error upserting banners:", error);
-             return { synced: false, error: error.message };
+            console.error("Error upserting banners:", error);
+            return { synced: false, error: error.message };
           }
         }
-        
+
         // Deletar banners removidos
         const currentIds = banners.map(b => b.id);
         const toDelete = existingIds.filter(id => !currentIds.includes(id));
         if (toDelete.length > 0) {
           const { error: deleteError } = await supabase.from('banners').delete().in('id', toDelete);
           if (deleteError) {
-             console.error("Error deleting banners:", deleteError);
-             return { synced: false, error: deleteError.message };
+            console.error("Error deleting banners:", deleteError);
+            return { synced: false, error: deleteError.message };
           }
         }
         return { synced: true };
@@ -197,33 +221,34 @@ export const storageService = {
         .from('videos')
         .select('*')
         .order('sort_order', { ascending: true });
-        
+
       if (!error && data) {
         return data.map(mapVideoFromDb);
       }
     }
     const data = localStorage.getItem(VIDEOS_KEY);
-    return data ? JSON.parse(data) : DEFAULT_VIDEOS;
+    const videos = data ? JSON.parse(data) : DEFAULT_VIDEOS;
+    return fixIds(videos, VIDEOS_KEY);
   },
 
   saveVideos: async (videos: VideoCard[]): Promise<{ synced: boolean; error?: string }> => {
     safeSaveLocal(VIDEOS_KEY, videos);
-    
+
     if (supabase) {
       try {
         const { data: existing, error: fetchError } = await supabase.from('videos').select('id');
         if (fetchError) return { synced: false, error: fetchError.message };
 
         const existingIds = existing?.map(v => v.id) || [];
-        
+
         const payload = videos.map((v, idx) => mapVideoToDb(v, idx));
-        
+
         if (payload.length > 0) {
-           const { error } = await supabase.from('videos').upsert(payload, { onConflict: 'id' });
-           if (error) {
-              console.error("Error upserting videos:", error);
-              return { synced: false, error: error.message };
-           }
+          const { error } = await supabase.from('videos').upsert(payload, { onConflict: 'id' });
+          if (error) {
+            console.error("Error upserting videos:", error);
+            return { synced: false, error: error.message };
+          }
         }
 
         const currentIds = videos.map(v => v.id);
@@ -248,35 +273,36 @@ export const storageService = {
         .from('notices')
         .select('*')
         .order('sort_order', { ascending: true });
-        
+
       if (!error && data) {
         return data.map(mapNoticeFromDb);
       }
     }
     const data = localStorage.getItem(NOTICES_KEY);
-    return data ? JSON.parse(data) : DEFAULT_NOTICES;
+    const notices = data ? JSON.parse(data) : DEFAULT_NOTICES;
+    return fixIds(notices, NOTICES_KEY);
   },
 
   saveNotices: async (notices: Notice[]): Promise<{ synced: boolean; error?: string }> => {
     safeSaveLocal(NOTICES_KEY, notices);
-    
+
     if (supabase) {
       try {
         const { data: existing, error: fetchError } = await supabase.from('notices').select('id');
         if (fetchError) return { synced: false, error: fetchError.message };
 
         const existingIds = existing?.map(n => n.id) || [];
-        
+
         const payload = notices.map((n, idx) => mapNoticeToDb(n, idx));
-        
+
         if (payload.length > 0) {
           const { error } = await supabase.from('notices').upsert(payload, { onConflict: 'id' });
           if (error) {
-             console.error("Error upserting notices:", error);
-             return { synced: false, error: error.message };
+            console.error("Error upserting notices:", error);
+            return { synced: false, error: error.message };
           }
         }
-        
+
         const currentIds = notices.map(n => n.id);
         const toDelete = existingIds.filter(id => !currentIds.includes(id));
         if (toDelete.length > 0) {
@@ -301,18 +327,18 @@ export const storageService = {
         .select('*')
         .eq('id', 'top')
         .single();
-        
+
       if (!error && data) {
         return mapPromoFromDb(data);
       }
     }
-    
+
     // Fallback LocalStorage
     try {
       const stored = localStorage.getItem(PROMO_KEY);
       if (stored) return JSON.parse(stored);
-    } catch(e) {}
-    
+    } catch (e) { }
+
     return DEFAULT_PROMO;
   },
 
@@ -338,7 +364,7 @@ export const storageService = {
         .select('*')
         .eq('id', 'bottom')
         .single();
-        
+
       if (!error && data) {
         return mapPromoFromDb(data);
       }
@@ -348,8 +374,8 @@ export const storageService = {
     try {
       const stored = localStorage.getItem(BOTTOM_PROMO_KEY);
       if (stored) return JSON.parse(stored);
-    } catch(e) {}
-    
+    } catch (e) { }
+
     return DEFAULT_BOTTOM_PROMO;
   },
 
@@ -369,8 +395,17 @@ export const storageService = {
   // ========== DELETE METHODS ==========
   deleteBanner: async (id: string) => {
     if (supabase) {
-      const { error } = await supabase.from('banners').delete().eq('id', id);
-      if (error) console.error("Error deleting banner:", error);
+      try {
+        // Buscar URL antes de deletar do DB para limpar Storage
+        const { data } = await supabase.from('banners').select('image_url').eq('id', id).single();
+        if (data?.image_url) {
+          await uploadService.deleteFileByUrl(data.image_url);
+        }
+        const { error } = await supabase.from('banners').delete().eq('id', id);
+        if (error) console.error("Error deleting banner:", error);
+      } catch (err) {
+        console.error("Error in deleteBanner flow:", err);
+      }
     }
     // Also remove from local storage
     try {
@@ -379,13 +414,29 @@ export const storageService = {
         const parsed = JSON.parse(stored);
         safeSaveLocal(BANNERS_KEY, parsed.filter((b: any) => b.id !== id));
       }
-    } catch(e) {}
+    } catch (e) { }
   },
 
   deleteVideo: async (id: string) => {
     if (supabase) {
-      const { error } = await supabase.from('videos').delete().eq('id', id);
-      if (error) console.error("Error deleting video:", error);
+      try {
+        // Buscar dados antes de deletar do DB
+        const { data } = await supabase.from('videos').select('cover_url, previews').eq('id', id).single();
+        if (data) {
+          // Deletar capa
+          if (data.cover_url) await uploadService.deleteFileByUrl(data.cover_url);
+          // Deletar previews
+          if (data.previews && Array.isArray(data.previews)) {
+            for (const url of data.previews) {
+              await uploadService.deleteFileByUrl(url);
+            }
+          }
+        }
+        const { error } = await supabase.from('videos').delete().eq('id', id);
+        if (error) console.error("Error deleting video:", error);
+      } catch (err) {
+        console.error("Error in deleteVideo flow:", err);
+      }
     }
     try {
       const stored = localStorage.getItem(VIDEOS_KEY);
@@ -393,7 +444,7 @@ export const storageService = {
         const parsed = JSON.parse(stored);
         safeSaveLocal(VIDEOS_KEY, parsed.filter((v: any) => v.id !== id));
       }
-    } catch(e) {}
+    } catch (e) { }
   },
 
   deleteNotice: async (id: string) => {
@@ -407,7 +458,7 @@ export const storageService = {
         const parsed = JSON.parse(stored);
         safeSaveLocal(NOTICES_KEY, parsed.filter((n: any) => n.id !== id));
       }
-    } catch(e) {}
+    } catch (e) { }
   },
 
   // ========== REALTIME SYNC ==========
@@ -417,7 +468,7 @@ export const storageService = {
     onNoticesChange?: (notices: Notice[]) => void;
     onPromosChange?: () => void;
   }) => {
-    if (!supabase) return () => {};
+    if (!supabase) return () => { };
 
     const channels: any[] = [];
 

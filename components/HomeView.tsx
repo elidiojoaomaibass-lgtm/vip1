@@ -14,18 +14,24 @@ const VideoFeedItem: React.FC<VideoPlayerProps> = ({ video, isDarkMode }) => {
   const [isPlaying, setIsPlaying] = useState(false);
   const [isMuted, setIsMuted] = useState(false);
   const [currentPreviewIndex, setCurrentPreviewIndex] = useState(0);
-  
+
   const [views, setViews] = useState(() => Math.floor(Math.random() * 800) + 150);
   const [sales, setSales] = useState(() => Math.floor(Math.random() * 120) + 45);
 
   // Garantir que previews seja um array válido
-  const validPreviews = Array.isArray(video.previews) 
-    ? video.previews.filter(url => url && url.length > 0) 
+  const validPreviews = Array.isArray(video.previews)
+    ? video.previews.filter(url => url && url.length > 0)
     : [];
-  
-  const currentVideoUrl = validPreviews.length > 0 
-    ? validPreviews[currentPreviewIndex] 
+
+  const currentVideoUrl = validPreviews.length > 0
+    ? validPreviews[currentPreviewIndex]
     : '';
+
+  const isUrlImage = (url: string) => {
+    return url.match(/\.(jpg|jpeg|png|gif|webp|svg|avif)(\?.*)?$/i);
+  };
+
+  const isCurrentPreviewImage = isUrlImage(currentVideoUrl);
 
   useEffect(() => {
     // Resetar índice quando o vídeo mudar
@@ -34,11 +40,19 @@ const VideoFeedItem: React.FC<VideoPlayerProps> = ({ video, isDarkMode }) => {
 
   useEffect(() => {
     // Se mudar o índice e estiver tocando, carregar e tocar o próximo
-    if (isPlaying && videoRef.current) {
-        videoRef.current.src = currentVideoUrl;
-        videoRef.current.play().catch(() => setIsPlaying(false));
+    if (isPlaying && videoRef.current && !isCurrentPreviewImage) {
+      videoRef.current.src = currentVideoUrl;
+      videoRef.current.play().catch(() => setIsPlaying(false));
     }
-  }, [currentPreviewIndex, currentVideoUrl]); // Removed isPlaying from deps to avoid loop
+
+    // Se for imagem e estiver "tocando", podemos simular um tempo e pular
+    if (isPlaying && isCurrentPreviewImage) {
+      const timer = setTimeout(() => {
+        handleVideoEnd();
+      }, 3000); // Fica 3 segundos na imagem
+      return () => clearTimeout(timer);
+    }
+  }, [currentPreviewIndex, currentVideoUrl, isPlaying, isCurrentPreviewImage]);
 
   const handleVideoEnd = () => {
     if (validPreviews.length > 1) {
@@ -106,40 +120,50 @@ const VideoFeedItem: React.FC<VideoPlayerProps> = ({ video, isDarkMode }) => {
 
   return (
     <div className={`p-4 rounded-2xl border transition-all duration-500 group animate-in fade-in slide-in-from-bottom-4 shadow-sm ${isDarkMode ? 'bg-zinc-900/40 border-zinc-800' : 'bg-white border-zinc-100'}`}>
-      <div 
+      <div
         className={`relative aspect-video rounded-2xl overflow-hidden shadow-md bg-black border transition-all ${isDarkMode ? 'border-zinc-800' : 'border-zinc-200'}`}
         onClick={togglePlay}
       >
-        <video 
-          ref={videoRef}
-          src={currentVideoUrl} 
-          // Only show poster if not playing (prevents flicker between videos)
-          poster={!isPlaying ? video.coverUrl : undefined}
-          playsInline 
-          className="w-full h-full object-contain bg-black"
-          onEnded={handleVideoEnd}
-          onTimeUpdate={handleTimeUpdate}
-        />
-        
+        {isCurrentPreviewImage ? (
+          <img
+            src={currentVideoUrl}
+            className="w-full h-full object-contain bg-black"
+            alt="Preview"
+          />
+        ) : (
+          <video
+            ref={videoRef}
+            src={currentVideoUrl}
+            // Only show poster if not playing (prevents flicker between videos)
+            poster={!isPlaying ? video.coverUrl : undefined}
+            playsInline
+            muted={isMuted}
+            className="w-full h-full object-contain bg-black"
+            onEnded={handleVideoEnd}
+            onTimeUpdate={handleTimeUpdate}
+          />
+        )}
+
         {/* Indicadores de Progresso (Story-like) */}
         {isPlaying && validPreviews.length > 1 && (
-           <div className="absolute top-3 left-3 right-3 flex gap-1 z-20">
-             {validPreviews.map((_, idx) => (
-               <div 
-                 key={idx} 
-                 className="h-0.5 rounded-full flex-1 bg-white/20 overflow-hidden"
-               >
-                 <div 
-                   className="h-full bg-white transition-all duration-100 ease-linear"
-                   style={{ 
-                     width: idx < currentPreviewIndex ? '100%' : idx === currentPreviewIndex ? `${progress}%` : '0%' 
-                   }}
-                 />
-               </div>
-             ))}
-           </div>
+          <div className="absolute top-3 left-3 right-3 flex gap-1 z-20">
+            {validPreviews.map((_, idx) => (
+              <div
+                key={idx}
+                className="h-0.5 rounded-full flex-1 bg-white/20 overflow-hidden"
+              >
+                <div
+                  className="h-full bg-white transition-all duration-100 ease-linear"
+                  style={{
+                    width: idx < currentPreviewIndex ? '100%' : idx === currentPreviewIndex ? `${isCurrentPreviewImage ? '100' : progress}%` : '0%',
+                    transition: (idx === currentPreviewIndex && isCurrentPreviewImage) ? 'width 3s linear' : 'none'
+                  }}
+                />
+              </div>
+            ))}
+          </div>
         )}
-        
+
         {!isPlaying && (
           <div className="absolute inset-0 flex items-center justify-center bg-black/20 pointer-events-none">
             <div className="w-14 h-14 bg-white/20 backdrop-blur-md rounded-full flex items-center justify-center text-white border border-white/30 scale-90 group-hover:scale-100 transition-transform">
@@ -150,13 +174,13 @@ const VideoFeedItem: React.FC<VideoPlayerProps> = ({ video, isDarkMode }) => {
 
         <div className="absolute bottom-3 left-3 right-3 flex items-center justify-between opacity-0 group-hover:opacity-100 transition-opacity">
           <div className="flex gap-1.5">
-            <button 
+            <button
               onClick={togglePlay}
               className="p-2 bg-black/60 backdrop-blur-md rounded-xl text-white hover:bg-violet-600 transition-colors"
             >
               {isPlaying ? <Pause size={14} /> : <Play size={14} fill="white" />}
             </button>
-            <button 
+            <button
               onClick={toggleMute}
               className="p-2 bg-black/60 backdrop-blur-md rounded-xl text-white hover:bg-violet-600 transition-colors"
             >
@@ -170,7 +194,7 @@ const VideoFeedItem: React.FC<VideoPlayerProps> = ({ video, isDarkMode }) => {
         <h3 className={`text-base font-black uppercase tracking-tight leading-tight ${isDarkMode ? 'text-white' : 'text-zinc-900'}`}>
           {video.title || 'PREMIUM PACK'}
         </h3>
-        
+
         <div className="flex items-center gap-4 py-1">
           <div className="flex items-center gap-1.5">
             <Eye size={12} className="text-zinc-400" />
@@ -190,7 +214,7 @@ const VideoFeedItem: React.FC<VideoPlayerProps> = ({ video, isDarkMode }) => {
       {(video.buyLink || video.telegramLink) && (
         <div className="flex gap-2 mt-4">
           {video.buyLink && (
-            <a 
+            <a
               href={video.buyLink}
               target="_blank"
               rel="noopener noreferrer"
@@ -201,7 +225,7 @@ const VideoFeedItem: React.FC<VideoPlayerProps> = ({ video, isDarkMode }) => {
             </a>
           )}
           {video.telegramLink && (
-            <a 
+            <a
               href={video.telegramLink}
               target="_blank"
               rel="noopener noreferrer"
@@ -228,13 +252,13 @@ interface Props {
 
 
 
-export const HomeView: React.FC<Props> = ({ 
-  banners, 
-  videos, 
-  promoCard, 
-  bottomPromoCard, 
+export const HomeView: React.FC<Props> = ({
+  banners,
+  videos,
+  promoCard,
+  bottomPromoCard,
   isDarkMode,
-  isLoading = false 
+  isLoading = false
 }) => {
   const [currentSlide, setCurrentSlide] = useState(0);
   const autoPlayRef = useRef<any>(null);
@@ -268,18 +292,18 @@ export const HomeView: React.FC<Props> = ({
       <div className="space-y-6 animate-pulse">
         {/* Banner Skeleton */}
         <section className="px-4 pt-4 relative w-full">
-           <Skeleton className="w-full aspect-video rounded-3xl" isDarkMode={isDarkMode} />
+          <Skeleton className="w-full aspect-video rounded-3xl" isDarkMode={isDarkMode} />
         </section>
 
         {/* Promo Skeleton */}
         <section className="px-4">
-           <Skeleton className="h-40 w-full rounded-3xl" isDarkMode={isDarkMode} />
+          <Skeleton className="h-40 w-full rounded-3xl" isDarkMode={isDarkMode} />
         </section>
 
         {/* Title Skeleton */}
         <section className="px-6 py-2 flex flex-col items-center gap-2">
-           <Skeleton className="h-8 w-48 rounded-lg" isDarkMode={isDarkMode} />
-           <Skeleton className="h-4 w-32 rounded-lg" isDarkMode={isDarkMode} />
+          <Skeleton className="h-8 w-48 rounded-lg" isDarkMode={isDarkMode} />
+          <Skeleton className="h-4 w-32 rounded-lg" isDarkMode={isDarkMode} />
         </section>
 
         {/* Video Grid Skeleton */}
@@ -290,8 +314,8 @@ export const HomeView: React.FC<Props> = ({
                 <Skeleton className="w-full aspect-video rounded-2xl mb-4" isDarkMode={isDarkMode} />
                 <Skeleton className="h-6 w-3/4 rounded-lg mb-2" isDarkMode={isDarkMode} />
                 <div className="flex justify-between">
-                   <Skeleton className="h-4 w-1/4 rounded-lg" isDarkMode={isDarkMode} />
-                   <Skeleton className="h-4 w-1/4 rounded-lg" isDarkMode={isDarkMode} />
+                  <Skeleton className="h-4 w-1/4 rounded-lg" isDarkMode={isDarkMode} />
+                  <Skeleton className="h-4 w-1/4 rounded-lg" isDarkMode={isDarkMode} />
                 </div>
               </div>
             ))}
@@ -306,39 +330,39 @@ export const HomeView: React.FC<Props> = ({
       <section className="px-4 pt-4 relative w-full min-h-[40px]">
         {validBanners.length > 0 ? (
           <div className={`relative overflow-hidden rounded-3xl shadow-xl aspect-video ${isDarkMode ? 'bg-zinc-900' : 'bg-zinc-100'}`}>
-            <div 
+            <div
               className="flex h-full transition-transform duration-700 ease-in-out"
               style={{ transform: `translateX(-${currentSlide * 100}%)` }}
             >
               {validBanners.map((banner) => {
                 const isVideo = banner.imageUrl.match(/\.(mp4|webm|mov)(\?.*)?$/i) || (banner.type === 'video' && !banner.imageUrl.match(/\.(jpg|jpeg|png|gif|webp)(\?.*)?$/i));
-                
+
                 return (
-                <div key={banner.id} className="min-w-full h-full relative flex flex-col items-center overflow-hidden">
-                  {isVideo ? (
-                    <video src={banner.imageUrl} autoPlay muted loop playsInline className="w-full h-full object-cover" />
-                  ) : (
-                    <img 
-                      src={banner.imageUrl} 
-                      alt="Banner" 
-                      className="w-full h-full object-cover"
-                      onError={(e) => {
-                        e.currentTarget.src = 'https://placehold.co/600x400/1e1e1e/FFF?text=Image+Error';
-                      }}
-                    />
-                  )}
-                  {hasValidLink(banner.link) && (
-                    <div className="absolute inset-0 flex flex-col justify-end p-6 bg-gradient-to-t from-black/70 via-transparent to-transparent">
-                      <div className="animate-in slide-in-from-bottom-4 duration-500">
-                        <a href={banner.link} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-2 bg-violet-600 hover:bg-violet-500 text-white px-6 py-3 rounded-xl font-black text-xs uppercase tracking-widest shadow-xl shadow-violet-600/30 transition-all active:scale-95 group">
-                          {banner.buttonText}
-                          <ExternalLink size={14} className="group-hover:translate-x-0.5 transition-transform" />
-                        </a>
+                  <div key={banner.id} className="min-w-full h-full relative flex flex-col items-center overflow-hidden">
+                    {isVideo ? (
+                      <video src={banner.imageUrl} autoPlay muted loop playsInline className="w-full h-full object-cover" />
+                    ) : (
+                      <img
+                        src={banner.imageUrl}
+                        alt="Banner"
+                        className="w-full h-full object-cover"
+                        onError={(e) => {
+                          e.currentTarget.src = 'https://placehold.co/600x400/1e1e1e/FFF?text=Image+Error';
+                        }}
+                      />
+                    )}
+                    {hasValidLink(banner.link) && (
+                      <div className="absolute inset-0 flex flex-col justify-end p-6 bg-gradient-to-t from-black/70 via-transparent to-transparent">
+                        <div className="animate-in slide-in-from-bottom-4 duration-500">
+                          <a href={banner.link} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-2 bg-violet-600 hover:bg-violet-500 text-white px-6 py-3 rounded-xl font-black text-xs uppercase tracking-widest shadow-xl shadow-violet-600/30 transition-all active:scale-95 group">
+                            {banner.buttonText}
+                            <ExternalLink size={14} className="group-hover:translate-x-0.5 transition-transform" />
+                          </a>
+                        </div>
                       </div>
-                    </div>
-                  )}
-                </div>
-              );
+                    )}
+                  </div>
+                );
               })}
             </div>
             {validBanners.length > 1 && (
@@ -360,15 +384,15 @@ export const HomeView: React.FC<Props> = ({
       {promoCard.isActive && (
         <section className="px-4">
           <div className={`p-6 rounded-3xl border transition-all shadow-xl ${isDarkMode ? 'bg-zinc-900/40 border-zinc-800' : 'bg-white border-zinc-100'}`}>
-             <div className="flex items-center gap-2 mb-3">
-               <h3 className={`font-black text-sm uppercase tracking-[0.2em] ${isDarkMode ? 'text-white' : 'text-zinc-900'}`}>{promoCard.title}</h3>
-             </div>
-             <p className={`text-xs leading-relaxed mb-6 font-medium ${isDarkMode ? 'text-zinc-400' : 'text-zinc-500'}`}>
-               {promoCard.description}
-             </p>
-             <a href={promoCard.buttonLink} target="_blank" rel="noopener noreferrer" className="flex items-center justify-center gap-3 w-full py-4 bg-zinc-900 dark:bg-zinc-100 dark:text-zinc-900 text-white rounded-2xl font-black text-[10px] uppercase tracking-[0.2em] transition-all active:scale-[0.98] shadow-lg">
-               {promoCard.buttonText}
-             </a>
+            <div className="flex items-center gap-2 mb-3">
+              <h3 className={`font-black text-sm uppercase tracking-[0.2em] ${isDarkMode ? 'text-white' : 'text-zinc-900'}`}>{promoCard.title}</h3>
+            </div>
+            <p className={`text-xs leading-relaxed mb-6 font-medium ${isDarkMode ? 'text-zinc-400' : 'text-zinc-500'}`}>
+              {promoCard.description}
+            </p>
+            <a href={promoCard.buttonLink} target="_blank" rel="noopener noreferrer" className="flex items-center justify-center gap-3 w-full py-4 bg-zinc-900 dark:bg-zinc-100 dark:text-zinc-900 text-white rounded-2xl font-black text-[10px] uppercase tracking-[0.2em] transition-all active:scale-[0.98] shadow-lg">
+              {promoCard.buttonText}
+            </a>
           </div>
         </section>
       )}
@@ -391,16 +415,16 @@ export const HomeView: React.FC<Props> = ({
       {bottomPromoCard?.isActive && (
         <section className="px-4 pt-4 pb-12">
           <div className={`p-6 rounded-2xl border transition-all shadow-xl ${isDarkMode ? 'bg-zinc-900/40 border-zinc-800' : 'bg-white border-zinc-100'}`}>
-             <div className="flex items-center gap-2 mb-3">
-               <h3 className={`font-black text-sm uppercase tracking-[0.2em] ${isDarkMode ? 'text-white' : 'text-zinc-900'}`}>{bottomPromoCard.title}</h3>
-             </div>
-             <p className={`text-xs leading-relaxed mb-6 font-medium ${isDarkMode ? 'text-zinc-400' : 'text-zinc-500'}`}>
-               {bottomPromoCard.description}
-             </p>
-             <a href={bottomPromoCard.buttonLink} target="_blank" rel="noopener noreferrer" className="flex items-center justify-center gap-3 w-full py-4 bg-violet-600 text-white rounded-2xl font-black text-[10px] uppercase tracking-[0.2em] transition-all active:scale-[0.98] shadow-lg shadow-violet-600/20">
-               {bottomPromoCard.buttonText}
-               <ExternalLink size={14} className="opacity-70" />
-             </a>
+            <div className="flex items-center gap-2 mb-3">
+              <h3 className={`font-black text-sm uppercase tracking-[0.2em] ${isDarkMode ? 'text-white' : 'text-zinc-900'}`}>{bottomPromoCard.title}</h3>
+            </div>
+            <p className={`text-xs leading-relaxed mb-6 font-medium ${isDarkMode ? 'text-zinc-400' : 'text-zinc-500'}`}>
+              {bottomPromoCard.description}
+            </p>
+            <a href={bottomPromoCard.buttonLink} target="_blank" rel="noopener noreferrer" className="flex items-center justify-center gap-3 w-full py-4 bg-violet-600 text-white rounded-2xl font-black text-[10px] uppercase tracking-[0.2em] transition-all active:scale-[0.98] shadow-lg shadow-violet-600/20">
+              {bottomPromoCard.buttonText}
+              <ExternalLink size={14} className="opacity-70" />
+            </a>
           </div>
         </section>
       )}
