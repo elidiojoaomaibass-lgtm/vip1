@@ -66,7 +66,7 @@ const fixIds = (items: any[], storageKey: string) => {
 
 const mapBannerToDb = (b: Banner, index: number) => ({
   id: b.id,
-  image_url: b.imageUrl || '',
+  images: b.images || [],
   link: b.link || '',
   button_text: b.buttonText || '',
   type: b.type || 'image',
@@ -76,7 +76,7 @@ const mapBannerToDb = (b: Banner, index: number) => ({
 
 const mapBannerFromDb = (b: any): Banner => ({
   id: b.id,
-  imageUrl: b.image_url,
+  images: Array.isArray(b.images) ? b.images : (b.image_url ? [b.image_url] : []),
   link: b.link,
   buttonText: b.button_text,
   type: b.type
@@ -396,10 +396,14 @@ export const storageService = {
   deleteBanner: async (id: string) => {
     if (supabase) {
       try {
-        // Buscar URL antes de deletar do DB para limpar Storage
-        const { data } = await supabase.from('banners').select('image_url').eq('id', id).single();
-        if (data?.image_url) {
-          await uploadService.deleteFileByUrl(data.image_url);
+        // Buscar URLs antes de deletar do DB para limpar Storage
+        // Selecionamos '*' para evitar erro se a coluna 'images' ainda não existir no DB
+        const { data } = await supabase.from('banners').select('*').eq('id', id).single();
+        if (data) {
+          const urls = Array.isArray(data.images) ? data.images : (data.image_url ? [data.image_url] : []);
+          for (const url of urls) {
+            await uploadService.deleteFileByUrl(url);
+          }
         }
         const { error } = await supabase.from('banners').delete().eq('id', id);
         if (error) console.error("Error deleting banner:", error);

@@ -66,7 +66,7 @@ export const AdminView: React.FC<Props> = ({
   }, []);
 
   const [formBanner, setFormBanner] = useState<Partial<Banner>>({
-    imageUrl: '', buttonText: 'Saiba Mais', link: '', type: 'image'
+    images: ['', '', '', '', ''], buttonText: 'Saiba Mais', link: '', type: 'image'
   });
   const [formVideo, setFormVideo] = useState<Partial<VideoCard>>({
     title: '', coverUrl: '', previews: [''], buyLink: '', buyButtonText: 'BUY ALL PACK', telegramLink: '', telegramButtonText: 'DM TELEGRAM'
@@ -128,8 +128,8 @@ export const AdminView: React.FC<Props> = ({
 
       // Upload para Supabase Storage
       let result;
-      if (target === 'banner') {
-        // Usa o mesmo método de upload, o bucket 'banners' aceita ambos
+      if (target === 'banner' || (typeof target === 'number' && tab === 'banners')) {
+        // Usa o bucket 'banners' para todas as fotos do carrossel
         result = await uploadService.uploadBannerImage(file);
       } else if (target === 'video-cover') {
         result = await uploadService.uploadVideoCover(file);
@@ -144,9 +144,17 @@ export const AdminView: React.FC<Props> = ({
       }
 
       // Atualizar estado com URL do Supabase
-      if (target === 'banner') {
-        const oldUrl = formBanner.imageUrl;
-        setFormBanner(p => ({ ...p, imageUrl: result.url! }));
+      if (typeof target === 'number' && tab === 'banners') {
+        const newImages = [...(formBanner.images || ['', '', '', '', ''])];
+        const oldUrl = newImages[target];
+        newImages[target] = result.url!;
+        setFormBanner(p => ({ ...p, images: newImages }));
+        if (oldUrl) await uploadService.deleteFileByUrl(oldUrl);
+      } else if (target === 'banner') {
+        const newImages = [...(formBanner.images || ['', '', '', '', ''])];
+        const oldUrl = newImages[0];
+        newImages[0] = result.url!;
+        setFormBanner(p => ({ ...p, images: newImages }));
         if (oldUrl) await uploadService.deleteFileByUrl(oldUrl);
       } else if (target === 'video-cover') {
         const oldUrl = formVideo.coverUrl;
@@ -171,10 +179,12 @@ export const AdminView: React.FC<Props> = ({
     let result: { synced: boolean; error?: string } = { synced: false };
 
     if (tab === 'banners') {
-      if (!formBanner.imageUrl) return;
+      const validImages = (formBanner.images || []).filter(url => typeof url === 'string' && url.trim() !== '');
+      if (validImages.length === 0) return;
+
       let newBanners;
-      if (editingId) newBanners = banners.map(b => b.id === editingId ? { ...b, ...formBanner } as Banner : b);
-      else newBanners = [...banners, { id: crypto.randomUUID(), imageUrl: formBanner.imageUrl!, buttonText: formBanner.buttonText || 'Saiba Mais', link: formBanner.link || '', type: formBanner.type || 'image' }];
+      if (editingId) newBanners = banners.map(b => b.id === editingId ? { ...b, ...formBanner, images: validImages } as Banner : b);
+      else newBanners = [...banners, { id: crypto.randomUUID(), images: validImages, buttonText: formBanner.buttonText || 'Saiba Mais', link: formBanner.link || '', type: formBanner.type || 'image' }];
 
       setBanners(newBanners);
       result = await storageService.saveBanners(newBanners);
@@ -210,12 +220,25 @@ export const AdminView: React.FC<Props> = ({
   const closeModal = () => {
     setShowAddModal(false);
     setEditingId(null);
-    setFormBanner({ imageUrl: '', buttonText: 'Saiba Mais', link: '', type: 'image' });
+    setFormBanner({ images: ['', '', '', '', ''], buttonText: 'Saiba Mais', link: '', type: 'image' });
     setFormVideo({ title: '', coverUrl: '', previews: [''], buyLink: '', buyButtonText: 'BUY ALL PACK', telegramLink: '', telegramButtonText: 'DM TELEGRAM' });
     setFormNotice({ title: '', content: '', date: new Date().toLocaleDateString('pt-BR') });
   };
 
-  const startEditBanner = (b: Banner) => { setEditingId(b.id); setFormBanner({ ...b }); setTab('banners'); setShowAddModal(true); };
+  const startEditBanner = (b: Banner) => {
+    setEditingId(b.id);
+    const current = b.images || [];
+    const safeImages = [
+      current[0] || '',
+      current[1] || '',
+      current[2] || '',
+      current[3] || '',
+      current[4] || ''
+    ];
+    setFormBanner({ ...b, images: safeImages });
+    setTab('banners');
+    setShowAddModal(true);
+  };
   const startEditVideo = (v: VideoCard) => {
     setEditingId(v.id);
     // Ensure always 3 slots for inputs
@@ -425,7 +448,8 @@ export const AdminView: React.FC<Props> = ({
         {/* Content Grid */}
         <div className={`grid gap-4 ${tab === 'promo' ? 'grid-cols-1' : 'grid-cols-1 md:grid-cols-2 lg:grid-cols-3'}`}>
           {tab === 'banners' && banners.map((b) => {
-            const isVideo = b.imageUrl.match(/\.(mp4|webm|mov)(\?.*)?$/i) || (b.type === 'video' && !b.imageUrl.match(/\.(jpg|jpeg|png|gif|webp)(\?.*)?$/i));
+            const firstImage = b.images?.[0] || '';
+            const isVideo = firstImage.match(/\.(mp4|webm|mov)(\?.*)?$/i) || (b.type === 'video' && !firstImage.match(/\.(jpg|jpeg|png|gif|webp)(\?.*)?$/i));
 
             return (
               <div key={b.id} className={`group relative p-4 rounded-xl border transition-all ${isDarkMode ? 'border-zinc-800 bg-zinc-950/40 hover:bg-zinc-900/60' : 'border-zinc-200 bg-white hover:border-violet-500/30 shadow-sm'}`}>
@@ -434,7 +458,7 @@ export const AdminView: React.FC<Props> = ({
                     <div className="w-full h-full flex items-center justify-center bg-zinc-900"><PlayCircle size={32} className="text-white/20" /></div>
                   ) : (
                     <img
-                      src={b.imageUrl}
+                      src={firstImage}
                       className="w-full h-full object-cover"
                       onError={(e) => {
                         e.currentTarget.src = 'https://placehold.co/600x400/1e1e1e/FFF?text=Image+Error';
@@ -442,8 +466,11 @@ export const AdminView: React.FC<Props> = ({
                       }}
                     />
                   )}
+                  <div className="absolute top-2 right-2 bg-violet-600 text-white text-[8px] font-black px-2 py-1 rounded-full shadow-lg">
+                    {b.images?.length || 0} FOTOS
+                  </div>
                   <div className="absolute bottom-0 left-0 right-0 bg-black/80 px-2 py-1">
-                    <p className="text-[8px] text-zinc-400 truncate">{b.imageUrl}</p>
+                    <p className="text-[8px] text-zinc-400 truncate">{firstImage}</p>
                   </div>
                   <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
                     <button onClick={() => startEditBanner(b)} className="p-3 bg-white text-zinc-900 rounded-full hover:scale-110 transition-transform"><Edit2 size={20} /></button>
@@ -522,27 +549,39 @@ export const AdminView: React.FC<Props> = ({
 
             <div className="space-y-6">
               {tab === 'banners' && (
-                <div className="grid md:grid-cols-2 gap-6">
+                <div className="grid md:grid-cols-2 gap-8">
                   <div className="space-y-6">
                     <div className="space-y-2">
-                      <label className="text-[10px] font-black text-zinc-500 uppercase tracking-widest italic ml-1">Tipo de Mídia</label>
+                      <label className="text-[10px] font-black text-zinc-500 uppercase tracking-widest italic ml-1">Tipo de Mídia Padrão</label>
                       <div className={`flex p-1 border rounded-xl ${isDarkMode ? 'bg-zinc-950 border-zinc-800' : 'bg-zinc-50 border-zinc-200'}`}>
                         <button onClick={() => setFormBanner(p => ({ ...p, type: 'image' }))} className={`flex-1 py-3 rounded-xl text-[10px] font-black ${formBanner.type === 'image' ? 'bg-white text-zinc-900 shadow-xl' : 'text-zinc-500'}`}>IMAGEM</button>
                         <button onClick={() => setFormBanner(p => ({ ...p, type: 'video' }))} className={`flex-1 py-3 rounded-xl text-[10px] font-black ${formBanner.type === 'video' ? 'bg-white text-zinc-900 shadow-xl' : 'text-zinc-500'}`}>VÍDEO</button>
                       </div>
                     </div>
-                    <div className="space-y-2">
-                      <label className="text-[10px] font-black text-zinc-500 uppercase tracking-widest italic ml-1">Link ou Upload</label>
-                      <div className="relative group">
-                        <input
-                          type="text"
-                          readOnly
-                          placeholder="Clique no ícone para Upload"
-                          className={`w-full border rounded-xl px-5 py-4 outline-none text-xs pr-14 cursor-default ${isDarkMode ? 'bg-zinc-950 border-zinc-800 text-white focus:border-violet-600' : 'bg-white border-zinc-200 text-zinc-900 focus:border-violet-600'}`}
-                          value={formBanner.imageUrl}
-                        />
-                        <label className="absolute right-2 top-2 p-2 bg-violet-600 text-white rounded-xl transition-all cursor-pointer hover:bg-violet-500 shadow-lg shadow-violet-600/20"><FileUp size={20} /><input type="file" className="hidden" accept={formBanner.type === 'image' ? 'image/*' : 'video/*'} onChange={(e) => handleFileUpload(e, 'banner')} /></label>
-                      </div>
+
+                    <div className="space-y-3">
+                      <label className="text-[10px] font-black text-zinc-500 uppercase tracking-widest italic ml-1">Fotos do Carrossel (Até 5)</label>
+                      {[0, 1, 2, 3, 4].map((index) => (
+                        <div key={index} className="relative group">
+                          <input
+                            type="text"
+                            readOnly
+                            placeholder={`Upload Foto ${index + 1}`}
+                            className={`w-full border rounded-xl px-5 py-4 outline-none text-[10px] pr-14 cursor-default ${isDarkMode ? 'bg-zinc-950 border-zinc-800 text-white focus:border-violet-600' : 'bg-white border-zinc-200 text-zinc-900 focus:border-violet-600'}`}
+                            value={formBanner.images?.[index] || ''}
+                          />
+                          <label className={`absolute right-2 top-2 p-2 bg-violet-600 text-white rounded-xl transition-all cursor-pointer hover:bg-violet-500 shadow-lg`}>
+                            {isUploading ? <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : <Upload size={20} />}
+                            <input
+                              type="file"
+                              className="hidden"
+                              accept={formBanner.type === 'image' ? 'image/*' : 'video/*'}
+                              onChange={(e) => handleFileUpload(e, index)}
+                              disabled={isUploading}
+                            />
+                          </label>
+                        </div>
+                      ))}
                     </div>
                   </div>
                   <div className="space-y-6">
@@ -553,6 +592,11 @@ export const AdminView: React.FC<Props> = ({
                     <div className="space-y-2">
                       <label className="text-[10px] font-black text-zinc-500 uppercase tracking-widest italic ml-1">Link</label>
                       <input type="text" placeholder="https://..." className={`w-full border rounded-xl px-5 py-4 outline-none text-xs ${isDarkMode ? 'bg-zinc-950 border-zinc-800 text-white focus:border-violet-600' : 'bg-white border-zinc-200 text-zinc-900 focus:border-violet-600'}`} value={formBanner.link} onChange={(e) => setFormBanner(p => ({ ...p, link: e.target.value }))} />
+                    </div>
+                    <div className={`p-4 rounded-xl border ${isDarkMode ? 'bg-zinc-950 border-zinc-800' : 'bg-zinc-50 border-zinc-200'} mt-4`}>
+                      <p className="text-[9px] text-zinc-400 font-bold uppercase leading-tight">
+                        * Todas as fotos cadastradas acima aparecerão sequencialmente no topo do app.
+                      </p>
                     </div>
                   </div>
                 </div>

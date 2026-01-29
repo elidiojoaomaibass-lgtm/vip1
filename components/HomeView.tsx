@@ -263,21 +263,31 @@ export const HomeView: React.FC<Props> = ({
   const [currentSlide, setCurrentSlide] = useState(0);
   const autoPlayRef = useRef<any>(null);
 
+  const allSlides = React.useMemo(() => {
+    const validBanners = (banners || []).filter(b => b.images && b.images.length > 0);
+    return validBanners.flatMap(b => b.images.map((img, idx) => ({
+      ...b,
+      imageUrl: img,
+      slideId: `${b.id}-${idx}`
+    })));
+  }, [banners]);
+
   useEffect(() => {
-    if (isLoading || banners.length <= 1) return;
+    // Reset slide index if out of bounds
+    if (currentSlide >= allSlides.length && allSlides.length > 0) {
+      setCurrentSlide(0);
+    }
+  }, [allSlides.length, currentSlide]);
 
-    const startAutoPlay = () => {
-      autoPlayRef.current = setInterval(() => {
-        setCurrentSlide((prev) => (prev + 1) % banners.length);
-      }, 5000);
-    };
+  useEffect(() => {
+    if (isLoading || allSlides.length <= 1) return;
 
-    startAutoPlay();
+    const interval = setInterval(() => {
+      setCurrentSlide((prev) => (prev + 1) % allSlides.length);
+    }, 4000); // 4 segundos para uma navegação mais dinâmica
 
-    return () => {
-      if (autoPlayRef.current) clearInterval(autoPlayRef.current);
-    };
-  }, [banners.length, isLoading]);
+    return () => clearInterval(interval);
+  }, [allSlides.length, isLoading]);
 
   const hasValidLink = (link: string | undefined) => {
     if (!link) return false;
@@ -285,7 +295,7 @@ export const HomeView: React.FC<Props> = ({
     return trimmed !== '' && trimmed !== '#' && trimmed !== 'https://' && trimmed !== 'http://';
   };
 
-  const validBanners = (banners || []).filter(b => b.imageUrl);
+  // Removido filter redundante pois já foi feito acima
 
   if (isLoading) {
     return (
@@ -328,17 +338,32 @@ export const HomeView: React.FC<Props> = ({
   return (
     <div className="space-y-6 animate-in fade-in duration-500">
       <section className="px-4 pt-4 relative w-full min-h-[40px]">
-        {validBanners.length > 0 ? (
+        {allSlides.length > 0 ? (
           <div className={`relative overflow-hidden rounded-3xl shadow-xl aspect-video ${isDarkMode ? 'bg-zinc-900' : 'bg-zinc-100'}`}>
+            {allSlides.length > 1 && (
+              <div className="absolute top-4 left-4 right-4 flex gap-1.5 z-20">
+                {allSlides.map((_, i) => (
+                  <div key={i} className="h-1 rounded-full flex-1 bg-white/20 overflow-hidden">
+                    <div
+                      className="h-full bg-white transition-all duration-[4000ms] ease-linear"
+                      style={{
+                        width: i === currentSlide ? '100%' : i < currentSlide ? '100%' : '0%',
+                        transition: i === currentSlide ? 'width 4000ms linear' : 'none'
+                      }}
+                    />
+                  </div>
+                ))}
+              </div>
+            )}
             <div
               className="flex h-full transition-transform duration-700 ease-in-out"
               style={{ transform: `translateX(-${currentSlide * 100}%)` }}
             >
-              {validBanners.map((banner) => {
+              {allSlides.map((banner) => {
                 const isVideo = banner.imageUrl.match(/\.(mp4|webm|mov)(\?.*)?$/i) || (banner.type === 'video' && !banner.imageUrl.match(/\.(jpg|jpeg|png|gif|webp)(\?.*)?$/i));
 
                 return (
-                  <div key={banner.id} className="min-w-full h-full relative flex flex-col items-center overflow-hidden">
+                  <div key={banner.slideId} className="min-w-full h-full relative flex flex-col items-center overflow-hidden">
                     {isVideo ? (
                       <video src={banner.imageUrl} autoPlay muted loop playsInline className="w-full h-full object-cover" />
                     ) : (
@@ -365,13 +390,7 @@ export const HomeView: React.FC<Props> = ({
                 );
               })}
             </div>
-            {validBanners.length > 1 && (
-              <div className="absolute bottom-4 left-0 right-0 flex justify-center gap-1.5 z-10 pointer-events-none">
-                {validBanners.map((_, i) => (
-                  <div key={i} className={`h-1 rounded-full transition-all duration-300 ${i === currentSlide ? 'w-6 bg-violet-600' : 'w-1.5 bg-white/40'}`} />
-                ))}
-              </div>
-            )}
+            {/* Indicadores de bolinha removidos em favor da barra de progresso superior style Instagram Stories */}
           </div>
         ) : (
           <div className={`w-full aspect-video rounded-3xl border-2 border-dashed flex flex-col items-center justify-center text-zinc-500 gap-2 transition-colors ${isDarkMode ? 'bg-zinc-800/10 border-zinc-800/30' : 'bg-zinc-50 border-zinc-200'}`}>

@@ -11,7 +11,7 @@ CREATE TABLE IF NOT EXISTS public.admins (
 -- 2. Banners (Top Banners do Carousel)
 CREATE TABLE IF NOT EXISTS public.banners (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    image_url TEXT NOT NULL,
+    images TEXT[] DEFAULT '{}',
     link TEXT,
     button_text TEXT,
     type TEXT DEFAULT 'image' CHECK (type IN ('image', 'video')),

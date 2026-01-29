@@ -1,7 +1,7 @@
 
 export interface Banner {
   id: string;
-  imageUrl: string; // URL da imagem ou do vídeo
+  images: string[]; // URLs das imagens ou vídeos
   link: string;
   buttonText: string;
   type?: 'image' | 'video';
