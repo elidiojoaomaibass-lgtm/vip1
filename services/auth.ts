@@ -138,7 +138,7 @@ export const authService = {
       // Limpar sessão local
       sessionStorage.removeItem('admin_session');
       localStorage.removeItem('admin_session');
-      
+
       const { error } = await supabase.auth.signOut();
       if (error) {
         return { error: error.message };
@@ -196,5 +196,29 @@ export const authService = {
   isAdmin: async (): Promise<boolean> => {
     const { user } = await authService.getSession();
     return user !== null;
+  },
+
+  /**
+   * Enviar e-mail de recuperação de senha
+   */
+  resetPassword: async (email: string): Promise<{ error: string | null }> => {
+    if (!supabase) {
+      return { error: 'Supabase não configurado' };
+    }
+
+    try {
+      const { error } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: `${window.location.origin}`,
+      });
+
+      if (error) {
+        return { error: error.message };
+      }
+
+      return { error: null };
+    } catch (err: any) {
+      console.error('Reset password error:', err);
+      return { error: 'Erro ao enviar email de recuperação' };
+    }
   }
 };

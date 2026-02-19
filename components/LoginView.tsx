@@ -18,6 +18,9 @@ export const LoginView: React.FC<Props> = ({ onLoginSuccess, onBack, isDarkMode 
   const [showTwoFactor, setShowTwoFactor] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
 
+  const [showForgotPassword, setShowForgotPassword] = useState(false);
+  const [resetSent, setResetSent] = useState(false);
+
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
@@ -39,6 +42,27 @@ export const LoginView: React.FC<Props> = ({ onLoginSuccess, onBack, isDarkMode 
       }
     } catch (err: any) {
       setError('Erro ao conectar ao servidor');
+      setIsLoading(false);
+    }
+  };
+
+  const handleResetPassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError('');
+    setIsLoading(true);
+
+    try {
+      const { error: resetError } = await authService.resetPassword(email);
+      if (resetError) {
+        setError(resetError);
+        setIsLoading(false);
+        return;
+      }
+
+      setResetSent(true);
+      setIsLoading(false);
+    } catch (err: any) {
+      setError('Erro ao enviar email');
       setIsLoading(false);
     }
   };
@@ -73,6 +97,8 @@ export const LoginView: React.FC<Props> = ({ onLoginSuccess, onBack, isDarkMode 
 
   const handleBackToLogin = () => {
     setShowTwoFactor(false);
+    setShowForgotPassword(false);
+    setResetSent(false);
     setTwoFactorCode('');
     setError('');
   };
@@ -81,7 +107,7 @@ export const LoginView: React.FC<Props> = ({ onLoginSuccess, onBack, isDarkMode 
     <div className="min-h-[80vh] flex flex-col items-center justify-center p-6 animate-in fade-in zoom-in duration-500">
       <div className={`w-full p-8 rounded-[2.5rem] border transition-all shadow-2xl ${isDarkMode ? 'bg-zinc-800/30 border-zinc-800 shadow-black/50' : 'bg-white border-zinc-100 shadow-zinc-200'}`}>
 
-        {!showTwoFactor ? (
+        {!showTwoFactor && !showForgotPassword ? (
           /* TELA DE LOGIN */
           <>
             <div className="flex flex-col items-center mb-8">
@@ -114,7 +140,16 @@ export const LoginView: React.FC<Props> = ({ onLoginSuccess, onBack, isDarkMode 
               </div>
 
               <div className="space-y-1.5">
-                <label className="text-[10px] font-black text-zinc-500 uppercase tracking-widest ml-1">Password</label>
+                <div className="flex justify-between items-center ml-1">
+                  <label className="text-[10px] font-black text-zinc-500 uppercase tracking-widest">Password</label>
+                  <button
+                    type="button"
+                    onClick={() => setShowForgotPassword(true)}
+                    className="text-[9px] font-black text-violet-500 uppercase tracking-widest hover:underline"
+                  >
+                    Esqueceu?
+                  </button>
+                </div>
                 <div className="relative">
                   <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-500" size={16} />
                   <input
@@ -167,6 +202,81 @@ export const LoginView: React.FC<Props> = ({ onLoginSuccess, onBack, isDarkMode 
               <ChevronLeft size={18} />
               Voltar para Home
             </button>
+          </>
+        ) : showForgotPassword ? (
+          /* TELA DE ESQUECI SENHA */
+          <>
+            <div className="flex flex-col items-center mb-8">
+              <div className="w-16 h-16 bg-amber-500 rounded-2xl flex items-center justify-center mb-4 shadow-xl shadow-amber-500/20">
+                <Mail className="text-white" size={28} />
+              </div>
+              <h2 className={`text-xl font-black italic uppercase tracking-tighter ${isDarkMode ? 'text-white' : 'text-zinc-900'}`}>
+                Recuperar Senha
+              </h2>
+              <p className="text-[10px] text-zinc-500 font-bold uppercase tracking-widest mt-1 text-center">
+                Insira seu e-mail para receber o link
+              </p>
+            </div>
+
+            {resetSent ? (
+              <div className="text-center space-y-6 py-4">
+                <div className="p-4 bg-green-500/10 border border-green-500/20 rounded-2xl text-green-500">
+                  <p className="text-[11px] font-bold uppercase tracking-widest">E-mail enviado!</p>
+                  <p className="text-[9px] mt-1 opacity-80">Verifique sua caixa de entrada para redefinir a senha.</p>
+                </div>
+                <button
+                  onClick={handleBackToLogin}
+                  className="w-full py-4 bg-violet-600 text-white rounded-2xl font-black text-xs uppercase tracking-widest shadow-xl transition-all active:scale-95"
+                >
+                  Voltar ao Login
+                </button>
+              </div>
+            ) : (
+              <form onSubmit={handleResetPassword} className="space-y-4">
+                <div className="space-y-1.5">
+                  <label className="text-[10px] font-black text-zinc-500 uppercase tracking-widest ml-1">E-mail</label>
+                  <div className="relative">
+                    <Mail className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-500" size={16} />
+                    <input
+                      type="email"
+                      required
+                      placeholder="seu-email@gmail.com"
+                      className={`w-full pl-11 pr-4 py-4 rounded-2xl outline-none text-sm transition-all border ${isDarkMode ? 'bg-zinc-900 border-zinc-800 text-white focus:border-violet-600' : 'bg-zinc-50 border-zinc-200 text-zinc-900 focus:border-violet-600'}`}
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      disabled={isLoading}
+                    />
+                  </div>
+                </div>
+
+                {error && (
+                  <div className="flex items-center gap-2 p-4 bg-red-500/10 border border-red-500/20 rounded-2xl text-red-500 animate-shake">
+                    <ShieldAlert size={16} />
+                    <p className="text-[10px] font-bold uppercase tracking-tight">{error}</p>
+                  </div>
+                )}
+
+                <button
+                  type="submit"
+                  disabled={isLoading}
+                  className="w-full py-4 bg-violet-600 hover:bg-violet-500 text-white rounded-2xl font-black text-xs uppercase tracking-widest shadow-xl transition-all active:scale-[0.98] flex items-center justify-center gap-2"
+                >
+                  {isLoading ? (
+                    <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                  ) : (
+                    'Enviar Link de Recuperação'
+                  )}
+                </button>
+
+                <button
+                  type="button"
+                  onClick={handleBackToLogin}
+                  className={`w-full py-2 rounded-2xl font-black text-[10px] uppercase tracking-widest transition-all ${isDarkMode ? 'text-zinc-500 hover:text-zinc-300' : 'text-zinc-400 hover:text-zinc-600'}`}
+                >
+                  Cancelar e Voltar
+                </button>
+              </form>
+            )}
           </>
         ) : (
           /* TELA DE 2FA */
