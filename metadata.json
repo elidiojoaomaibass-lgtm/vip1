@@ -1,0 +1,5 @@
+{
+  "name": "memberhub",
+  "description": "A mobile-first video platform with an administrative dashboard to manage banners and video cards with multiple previews.",
+  "requestFramePermissions": []
+}

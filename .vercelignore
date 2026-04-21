@@ -1,0 +1,11 @@
+node_modules
+.env.local
+.git
+*.log
+.DS_Store
+.vscode
+.idea
+dist
+scripts
+email-templates
+database
