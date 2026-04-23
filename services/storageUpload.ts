@@ -226,7 +226,7 @@ export const uploadService = {
     ]);
     if (!typeValidation.valid) return typeValidation;
 
-    // Validar tamanho (500MB)
-    return uploadService.validateFileSize(file, 500);
+    // Validar tamanho (2000MB - 2GB)
+    return uploadService.validateFileSize(file, 2000);
   }
 };

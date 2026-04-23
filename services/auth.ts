@@ -1,4 +1,5 @@
 import { supabase } from './supabase';
+import { twoFactorService } from './twoFactor';
 
 export interface User {
   id: string;
@@ -51,16 +52,11 @@ export const authService = {
         return { requiresTwoFactor: false, error: 'Acesso não autorizado. Este usuário não é um administrador.' };
       }
 
-      // Credenciais válidas! Agora fazer logout temporário e enviar OTP
-      await supabase.auth.signOut();
+      // Enviar código OTP usando o serviço customizado ANTES de fazer logout (para o RLS permitir)
+      const { error: otpError } = await twoFactorService.sendCode(email, authData.user.id);
 
-      // Enviar código OTP por email usando Magic Link do Supabase
-      const { error: otpError } = await supabase.auth.signInWithOtp({
-        email: email,
-        options: {
-          shouldCreateUser: false, // Não criar usuário, apenas enviar código
-        }
-      });
+      // Credenciais válidas e código gerado! Agora fazer logout temporário
+      await supabase.auth.signOut();
 
       if (otpError) {
         console.error('OTP error:', otpError);
@@ -81,28 +77,31 @@ export const authService = {
   /**
    * PASSO 2: Validar código OTP e completar login
    */
-  loginStep2: async (email: string, password: string, code: string): Promise<{ user: User | null; error: string | null }> => {
+  loginStep2: async (email: string, _password: string, code: string): Promise<{ user: User | null; error: string | null }> => {
     if (!supabase) {
       return { user: null, error: 'Supabase não configurado' };
     }
 
     try {
-      // Verificar o código OTP
-      const { data: verifyData, error: verifyError } = await supabase.auth.verifyOtp({
-        email: email,
-        token: code,
-        type: 'email'
-      });
+      // Verificar o código OTP — o verifyOtp já cria a sessão automaticamente
+      const { valid, error: verifyError } = await twoFactorService.validateCode(email, code);
 
-      if (verifyError || !verifyData.user) {
-        return { user: null, error: 'Código inválido ou expirado' };
+      if (!valid || verifyError) {
+        return { user: null, error: verifyError || 'Código inválido ou expirado' };
       }
 
-      // OTP válido! Buscar dados do admin
+      // Sessão já criada pelo verifyOtp — buscar sessão atual
+      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+
+      if (sessionError || !session) {
+        return { user: null, error: 'Erro ao obter sessão após verificação' };
+      }
+
+      // Verificar se é admin
       const { data: adminData, error: adminError } = await supabase
         .from('admins')
         .select('*')
-        .eq('user_id', verifyData.user.id)
+        .eq('user_id', session.user.id)
         .eq('is_active', true)
         .single();
 
@@ -114,8 +113,8 @@ export const authService = {
       // Login completo!
       return {
         user: {
-          id: verifyData.user.id,
-          email: verifyData.user.email!,
+          id: session.user.id,
+          email: session.user.email!,
           role: adminData.role
         },
         error: null
