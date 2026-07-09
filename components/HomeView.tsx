@@ -1,12 +1,302 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { Banner, VideoCard, PromoCard } from '../types';
-import { Play, ExternalLink, Send, Pause, Volume2, VolumeX, ShoppingCart, Sparkles, Eye, X } from 'lucide-react';
+import { Play, ExternalLink, Send, Pause, Volume2, VolumeX, ShoppingCart, Sparkles, Eye, X, CreditCard, Gift, Bitcoin, ChevronRight, CheckCircle2 } from 'lucide-react';
 import { Skeleton } from './Skeleton';
+
+// ─── Payment Methods Modal ────────────────────────────────────────────────────
+
+interface PaymentMethod {
+  id: string;
+  label: string;
+  icon: React.ReactNode;
+  color: string;
+  gradientFrom: string;
+  gradientTo: string;
+  badge?: string;
+}
+
+const PAYMENT_METHODS: PaymentMethod[] = [
+  {
+    id: 'apple_pay',
+    label: 'Apple Pay',
+    icon: (
+      <svg viewBox="0 0 24 24" fill="currentColor" className="w-5 h-5">
+        <path d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.8-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83M13 3.5c.73-.83 1.94-1.46 2.94-1.5.13 1.17-.34 2.35-1.04 3.19-.69.85-1.83 1.51-2.95 1.42-.15-1.15.41-2.35 1.05-3.11z"/>
+      </svg>
+    ),
+    color: 'text-white',
+    gradientFrom: '#1a1a1a',
+    gradientTo: '#3a3a3a',
+    badge: 'Instant',
+  },
+  {
+    id: 'binance',
+    label: 'Binance',
+    icon: (
+      <svg viewBox="0 0 24 24" fill="currentColor" className="w-5 h-5">
+        <path d="M12 1.5L8.25 5.25 12 9l3.75-3.75L12 1.5zM6 7.5L2.25 11.25 6 15l3.75-3.75L6 7.5zm12 0l-3.75 3.75L18 15l3.75-3.75L18 7.5zM12 13.5l-3.75 3.75L12 21l3.75-3.75L12 13.5z"/>
+      </svg>
+    ),
+    color: 'text-[#1E2026]',
+    gradientFrom: '#F3BA2F',
+    gradientTo: '#d4a017',
+    badge: 'Crypto',
+  },
+  {
+    id: 'cashapp_bitcoin',
+    label: 'CashApp · Bitcoin',
+    icon: (
+      <svg viewBox="0 0 24 24" fill="currentColor" className="w-5 h-5">
+        <path d="M14.25 2.5a.75.75 0 0 0-1.5 0V4h-1.5c-2.071 0-3.75 1.679-3.75 3.75 0 2.013 1.595 3.657 3.587 3.743L12 11.5h1.5v3H12a2.25 2.25 0 0 1-2.25-2.25.75.75 0 0 0-1.5 0A3.75 3.75 0 0 0 12 16h.75v1.5a.75.75 0 0 0 1.5 0V16h.75A3.75 3.75 0 0 0 18.75 12.25c0-2.013-1.595-3.657-3.587-3.744L14.25 8.5H12.75V5.5H14a2.25 2.25 0 0 1 2.25 2.25.75.75 0 0 0 1.5 0A3.75 3.75 0 0 0 14 2.5h-.75V1a.75.75 0 0 0-1.5 0v1.5z"/>
+      </svg>
+    ),
+    color: 'text-white',
+    gradientFrom: '#00D632',
+    gradientTo: '#00a028',
+  },
+  {
+    id: 'crypto',
+    label: 'Crypto',
+    icon: <Bitcoin className="w-5 h-5" />,
+    color: 'text-white',
+    gradientFrom: '#7C3AED',
+    gradientTo: '#4F46E5',
+    badge: 'Any coin',
+  },
+  {
+    id: 'credit_debit_card',
+    label: 'Credit or Debit Card',
+    icon: <CreditCard className="w-5 h-5" />,
+    color: 'text-white',
+    gradientFrom: '#0EA5E9',
+    gradientTo: '#0284C7',
+  },
+  {
+    id: 'paypal',
+    label: 'PayPal',
+    icon: (
+      <svg viewBox="0 0 24 24" fill="currentColor" className="w-5 h-5">
+        <path d="M19.554 9.488c.121.563.106 1.246-.04 2.051-.582 2.978-2.485 4.45-5.765 4.45H13.1a.705.705 0 0 0-.637.407l-.803 4.96-.227 1.402a.37.37 0 0 1-.366.31H8.517a.353.353 0 0 1-.348-.407l.099-.607.96-6.07.062-.344a.705.705 0 0 1 .636-.407h1.29c2.962 0 5.021-1.317 5.762-4.164.301-1.122.332-2.123.154-2.967.44.155.806.45 1.077.854.308.45.488 1.025.547 1.532z"/>
+        <path d="M18.27 6.705a5.345 5.345 0 0 0-.886-.067H12.04c-.295 0-.55.19-.625.477l-1.27 7.808c-.05.314.187.592.5.592h2.972l.745-4.72.024-.163a.645.645 0 0 1 .625-.477h1.303c2.552 0 4.55-1.037 5.131-4.04a3.8 3.8 0 0 0-.079-2.143 2.8 2.8 0 0 0-1.25-.903 4.5 4.5 0 0 0-.946-.364z"/>
+        <path d="M10.64 6.715a.645.645 0 0 1 .625-.477h5.343c.633 0 1.22.04 1.757.126a5.04 5.04 0 0 1 .886.272A3.6 3.6 0 0 1 20.5 7.7c.318-2.025-.003-3.405-1.094-4.652C18.265 1.746 16.276 1 13.77 1H6.862a.725.725 0 0 0-.715.613L3.017 20.238a.436.436 0 0 0 .431.505h3.141l1.256-7.972 1.795-6.056z"/>
+      </svg>
+    ),
+    color: 'text-white',
+    gradientFrom: '#003087',
+    gradientTo: '#009cde',
+    badge: 'Secure',
+  },
+  {
+    id: 'gift_card',
+    label: 'Gift Card',
+    icon: <Gift className="w-5 h-5" />,
+    color: 'text-white',
+    gradientFrom: '#EC4899',
+    gradientTo: '#BE185D',
+  },
+];
+
+interface PaymentModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  isDarkMode: boolean;
+  telegramLink: string;
+  itemName: string;
+  itemPrice?: string;
+}
+
+const PaymentModal: React.FC<PaymentModalProps> = ({ isOpen, onClose, isDarkMode, telegramLink, itemName, itemPrice }) => {
+  const [selected, setSelected] = useState<string | null>(null);
+  const [confirming, setConfirming] = useState(false);
+
+  useEffect(() => {
+    if (!isOpen) {
+      setSelected(null);
+      setConfirming(false);
+    }
+  }, [isOpen]);
+
+  const handleSelect = (methodId: string) => {
+    setSelected(methodId);
+  };
+
+  const handleConfirm = () => {
+    if (!selected) return;
+    const method = PAYMENT_METHODS.find(m => m.id === selected);
+    if (!method) return;
+
+    setConfirming(true);
+    const cleanUrl = ensureAbsoluteUrl(telegramLink);
+    const priceText = itemPrice ? ` (${itemPrice})` : '';
+    const message = `Hi! 👋\n\nI want to buy "${itemName}"${priceText}.\n\n💵 Payment method: ${method.label}\n\nPlease provide payment instructions. 🚀`;
+    const finalUrl = `${cleanUrl}${cleanUrl.includes('?') ? '&' : '?'}text=${encodeURIComponent(message)}`;
+
+    setTimeout(() => {
+      window.open(finalUrl, '_blank', 'noopener,noreferrer');
+      onClose();
+    }, 600);
+  };
+
+  if (!isOpen) return null;
+
+  return (
+    <div
+      className="fixed inset-0 z-[200] flex items-end justify-center"
+      onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
+    >
+      {/* Backdrop */}
+      <div className="absolute inset-0 bg-black/70 backdrop-blur-sm animate-in fade-in duration-200" />
+
+      {/* Sheet */}
+      <div
+        className={`relative w-full max-w-lg rounded-t-3xl shadow-2xl animate-in slide-in-from-bottom-8 duration-300 ${
+          isDarkMode ? 'bg-zinc-950 border-t border-zinc-800' : 'bg-white border-t border-zinc-100'
+        }`}
+      >
+        {/* Handle */}
+        <div className="flex justify-center pt-3 pb-1">
+          <div className={`w-10 h-1 rounded-full ${isDarkMode ? 'bg-zinc-700' : 'bg-zinc-200'}`} />
+        </div>
+
+        {/* Header */}
+        <div className="flex items-center justify-between px-5 pt-3 pb-4">
+          <div>
+            <p className={`text-[10px] font-bold uppercase tracking-widest mb-0.5 ${
+              isDarkMode ? 'text-zinc-500' : 'text-zinc-400'
+            }`}>Secure Checkout</p>
+            <h2 className={`text-lg font-black tracking-tight ${
+              isDarkMode ? 'text-white' : 'text-zinc-900'
+            }`}>💵 Payment Method</h2>
+          </div>
+          <button
+            onClick={onClose}
+            className={`p-2 rounded-xl transition-colors ${
+              isDarkMode ? 'hover:bg-zinc-800 text-zinc-400' : 'hover:bg-zinc-100 text-zinc-500'
+            }`}
+          >
+            <X size={18} />
+          </button>
+        </div>
+
+        {/* Item info */}
+        <div className={`mx-5 mb-4 px-4 py-3 rounded-2xl text-xs font-bold flex items-center justify-between ${
+          isDarkMode ? 'bg-zinc-900 text-zinc-300' : 'bg-zinc-50 text-zinc-600'
+        }`}>
+          <span className="truncate mr-3 uppercase tracking-wide">{itemName}</span>
+          {itemPrice && (
+            <span className="text-violet-500 font-black shrink-0">{itemPrice}</span>
+          )}
+        </div>
+
+        {/* Payment methods list */}
+        <div className="px-5 pb-2 flex flex-col gap-2.5 max-h-[50vh] overflow-y-auto">
+          {PAYMENT_METHODS.map((method) => {
+            const isActive = selected === method.id;
+            return (
+              <button
+                key={method.id}
+                onClick={() => handleSelect(method.id)}
+                className={`relative flex items-center gap-4 p-3.5 rounded-2xl border-2 transition-all duration-200 text-left ${
+                  isActive
+                    ? 'border-violet-500 shadow-lg shadow-violet-500/20 scale-[1.01]'
+                    : isDarkMode
+                      ? 'border-zinc-800 hover:border-zinc-700 bg-zinc-900/60'
+                      : 'border-zinc-100 hover:border-zinc-200 bg-white'
+                }`}
+              >
+                {/* Icon pill */}
+                <div
+                  className="w-11 h-11 rounded-xl flex items-center justify-center shrink-0 shadow-md"
+                  style={{ background: `linear-gradient(135deg, ${method.gradientFrom}, ${method.gradientTo})` }}
+                >
+                  <span className={method.color}>{method.icon}</span>
+                </div>
+
+                {/* Label */}
+                <div className="flex-1 min-w-0">
+                  <p className={`font-black text-sm tracking-tight ${
+                    isDarkMode ? 'text-white' : 'text-zinc-900'
+                  }`}>{method.label}</p>
+                  {method.badge && (
+                    <span className="text-[9px] font-bold uppercase tracking-widest text-violet-400">{method.badge}</span>
+                  )}
+                </div>
+
+                {/* Check or arrow */}
+                {isActive ? (
+                  <CheckCircle2 className="text-violet-500 shrink-0" size={20} />
+                ) : (
+                  <ChevronRight className={`shrink-0 opacity-30 ${
+                    isDarkMode ? 'text-white' : 'text-zinc-900'
+                  }`} size={18} />
+                )}
+              </button>
+            );
+          })}
+        </div>
+
+        {/* Confirm CTA */}
+        <div className="px-5 pt-4 pb-8">
+          <button
+            onClick={handleConfirm}
+            disabled={!selected || confirming}
+            className={`w-full py-4 rounded-2xl font-black text-[11px] uppercase tracking-[0.2em] transition-all duration-300 flex items-center justify-center gap-2 ${
+              selected && !confirming
+                ? 'bg-gradient-to-r from-violet-600 to-indigo-600 text-white shadow-xl shadow-violet-600/30 active:scale-[0.98] hover:from-violet-500 hover:to-indigo-500'
+                : isDarkMode
+                  ? 'bg-zinc-800 text-zinc-600 cursor-not-allowed'
+                  : 'bg-zinc-100 text-zinc-400 cursor-not-allowed'
+            }`}
+          >
+            {confirming ? (
+              <>
+                <svg className="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z" />
+                </svg>
+                Redirecting...
+              </>
+            ) : (
+              <>
+                <Send size={14} />
+                {selected ? `Pay with ${PAYMENT_METHODS.find(m => m.id === selected)?.label}` : 'Select a payment method'}
+              </>
+            )}
+          </button>
+          <p className={`text-center text-[9px] mt-3 font-medium ${
+            isDarkMode ? 'text-zinc-600' : 'text-zinc-400'
+          }`}>🔒 You'll be redirected to our secure Telegram to complete the order</p>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+const ensureAbsoluteUrl = (url: string): string => {
+  if (!url) return '';
+  const trimmed = url.trim();
+
+  // Já tem protocolo completo (https://t.me/... ou https://...)
+  if (/^https?:\/\//i.test(trimmed)) return trimmed;
+
+  // Começa com t.me/ ou telegram.me/ sem protocolo
+  if (/^(t\.me|telegram\.me)\//i.test(trimmed)) return `https://${trimmed}`;
+
+  // Username com @ (ex: @elite_18_vip)
+  if (trimmed.startsWith('@')) return `https://t.me/${trimmed.slice(1)}`;
+
+  // Username puro sem @ e sem domínio (ex: elite_18_vip)
+  // Detecta: só letras, números e underscores — típico de username do Telegram
+  if (/^[a-zA-Z0-9_]{3,}$/.test(trimmed)) return `https://t.me/${trimmed}`;
+
+  // Fallback: adiciona https:// e deixa o browser decidir
+  return `https://${trimmed}`;
+};
 
 const getTelegramUrlWithMessage = (url?: string, buttonText?: string, folderName?: string, folderPrice?: string) => {
   if (!url) return '';
-  const cleanUrl = url.trim();
+  const cleanUrl = ensureAbsoluteUrl(url);
   if (!cleanUrl.toLowerCase().includes('t.me') && !cleanUrl.toLowerCase().includes('telegram')) return cleanUrl;
   if (cleanUrl.toLowerCase().includes('text=')) return cleanUrl;
   
@@ -23,6 +313,8 @@ const getTelegramUrlWithMessage = (url?: string, buttonText?: string, folderName
 
   return cleanUrl;
 };
+
+// ─── VideoFeedItem ────────────────────────────────────────────────────────────
 
 interface VideoPlayerProps {
   video: VideoCard;
@@ -232,34 +524,72 @@ const VideoFeedItem: React.FC<VideoPlayerProps> = ({ video, isDarkMode }) => {
       </div>
 
       {(video.buyLink || video.telegramLink) && (
-        <div className="flex gap-2 mt-4">
-          {video.buyLink && (
-            <a
-              href={video.buyLink}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="flex-1 flex items-center justify-center gap-2 py-3.5 bg-red-600 hover:bg-red-500 text-white rounded-xl font-black text-[10px] uppercase tracking-widest transition-all active:scale-[0.98] shadow-lg shadow-red-600/20"
-            >
-              <ShoppingCart size={14} />
-              {video.buyButtonText || 'BUY ALL PACK'}
-            </a>
-          )}
-          {video.telegramLink && (
-            <a
-              href={getTelegramUrlWithMessage(video.telegramLink, video.telegramButtonText || 'DM TELEGRAM', video.title, video.price)}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="flex-1 flex items-center justify-center gap-2 py-3.5 bg-sky-500 hover:bg-sky-400 text-white rounded-xl font-black text-[10px] uppercase tracking-widest shadow-lg shadow-sky-500/20 transition-all active:scale-[0.98]"
-            >
-              <Send size={14} />
-              {video.telegramButtonText || 'DM TELEGRAM'}
-            </a>
-          )}
-        </div>
+        <BuyButtonWithModal video={video} isDarkMode={isDarkMode} />
       )}
     </div>
   );
 };
+
+// ─── BuyButtonWithModal ───────────────────────────────────────────────────────
+
+interface BuyButtonWithModalProps {
+  video: VideoCard;
+  isDarkMode: boolean;
+}
+
+const BuyButtonWithModal: React.FC<BuyButtonWithModalProps> = ({ video, isDarkMode }) => {
+  const [modalOpen, setModalOpen] = useState(false);
+
+  // Only use the telegramLink — never fallback to buyLink (e.g. buymeacoffee)
+  // The modal always redirects to Telegram with the selected payment method
+  const telegramLink = video.telegramLink || '';
+
+  // Show BUY button only when there's a telegram link to send the order to
+  const hasTelegramLink = !!telegramLink;
+
+  return (
+    <>
+      <div className="flex gap-2 mt-4">
+        {/* BUY button → opens payment method modal (only if telegramLink exists) */}
+        {hasTelegramLink && (
+          <button
+            onClick={() => setModalOpen(true)}
+            className="flex-1 flex items-center justify-center gap-2 py-3.5 bg-red-600 hover:bg-red-500 active:scale-[0.98] text-white rounded-xl font-black text-[10px] uppercase tracking-widest transition-all shadow-lg shadow-red-600/20"
+          >
+            <ShoppingCart size={14} />
+            {video.buyButtonText || 'BUY NOW'}
+          </button>
+        )}
+
+        {/* DM TELEGRAM button → direct Telegram link (without payment modal) */}
+        {video.telegramLink && (
+          <a
+            href={getTelegramUrlWithMessage(video.telegramLink, video.telegramButtonText || 'DM TELEGRAM', video.title, video.price)}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex-1 flex items-center justify-center gap-2 py-3.5 bg-sky-500 hover:bg-sky-400 text-white rounded-xl font-black text-[10px] uppercase tracking-widest shadow-lg shadow-sky-500/20 transition-all active:scale-[0.98]"
+          >
+            <Send size={14} />
+            {video.telegramButtonText || 'DM TELEGRAM'}
+          </a>
+        )}
+      </div>
+
+      {hasTelegramLink && (
+        <PaymentModal
+          isOpen={modalOpen}
+          onClose={() => setModalOpen(false)}
+          isDarkMode={isDarkMode}
+          telegramLink={telegramLink}
+          itemName={video.title || 'PREMIUM PACK'}
+          itemPrice={video.price}
+        />
+      )}
+    </>
+  );
+};
+
+// ─── HomeView Props ───────────────────────────────────────────────────────────
 
 interface Props {
   banners: Banner[];
@@ -349,6 +679,8 @@ export const HomeView: React.FC<Props> = ({
 }) => {
   const [currentSlide, setCurrentSlide] = useState(0);
   const autoPlayRef = useRef<any>(null);
+  const [promoModalOpen, setPromoModalOpen] = useState(false);
+  const [bottomPromoModalOpen, setBottomPromoModalOpen] = useState(false);
 
   const allSlides = React.useMemo(() => {
     const validBanners = (banners || []).filter(b => b.images && b.images.length > 0);
@@ -496,12 +828,25 @@ export const HomeView: React.FC<Props> = ({
             <p className={`text-xs leading-relaxed mb-6 font-medium ${isDarkMode ? 'text-zinc-400' : 'text-zinc-500'}`}>
               {promoCard.description}
             </p>
-            <a href={getTelegramUrlWithMessage(promoCard.buttonLink, promoCard.buttonText, promoCard.title, promoCard.price)} target="_blank" rel="noopener noreferrer" className="flex items-center justify-center gap-3 w-full py-4 bg-zinc-900 dark:bg-zinc-100 dark:text-zinc-900 text-white rounded-2xl font-black text-[10px] uppercase tracking-[0.2em] transition-all active:scale-[0.98] shadow-lg">
+            <button
+              onClick={() => setPromoModalOpen(true)}
+              className="flex items-center justify-center gap-3 w-full py-4 bg-zinc-900 dark:bg-zinc-100 dark:text-zinc-900 text-white rounded-2xl font-black text-[10px] uppercase tracking-[0.2em] transition-all active:scale-[0.98] shadow-lg hover:opacity-90"
+            >
+              <ShoppingCart size={14} />
               {promoCard.buttonText}
-            </a>
+            </button>
           </div>
         </section>
       )}
+
+      <PaymentModal
+        isOpen={promoModalOpen}
+        onClose={() => setPromoModalOpen(false)}
+        isDarkMode={isDarkMode}
+        telegramLink={promoCard.buttonLink || ''}
+        itemName={promoCard.title || 'VIP PROMOTION'}
+        itemPrice={promoCard.price}
+      />
 
       <section className="px-6 py-2 text-center">
         <h1 className={`text-2xl font-black tracking-tighter leading-tight uppercase ${isDarkMode ? 'text-white' : 'text-zinc-900'}`}>
@@ -527,13 +872,25 @@ export const HomeView: React.FC<Props> = ({
             <p className={`text-xs leading-relaxed mb-6 font-medium ${isDarkMode ? 'text-zinc-400' : 'text-zinc-500'}`}>
               {bottomPromoCard.description}
             </p>
-            <a href={getTelegramUrlWithMessage(bottomPromoCard.buttonLink, bottomPromoCard.buttonText, bottomPromoCard.title, bottomPromoCard.price)} target="_blank" rel="noopener noreferrer" className="flex items-center justify-center gap-3 w-full py-4 bg-violet-600 text-white rounded-2xl font-black text-[10px] uppercase tracking-[0.2em] transition-all active:scale-[0.98] shadow-lg shadow-violet-600/20">
+            <button
+              onClick={() => setBottomPromoModalOpen(true)}
+              className="flex items-center justify-center gap-3 w-full py-4 bg-violet-600 text-white rounded-2xl font-black text-[10px] uppercase tracking-[0.2em] transition-all active:scale-[0.98] shadow-lg shadow-violet-600/20 hover:bg-violet-500"
+            >
+              <ShoppingCart size={14} />
               {bottomPromoCard.buttonText}
-              <ExternalLink size={14} className="opacity-70" />
-            </a>
+            </button>
           </div>
         </section>
       )}
+
+      <PaymentModal
+        isOpen={bottomPromoModalOpen}
+        onClose={() => setBottomPromoModalOpen(false)}
+        isDarkMode={isDarkMode}
+        telegramLink={bottomPromoCard?.buttonLink || ''}
+        itemName={bottomPromoCard?.title || 'VIP PROMOTION'}
+        itemPrice={bottomPromoCard?.price}
+      />
 
       <PurchaseToast isDarkMode={isDarkMode} videos={videos} />
     </div>
