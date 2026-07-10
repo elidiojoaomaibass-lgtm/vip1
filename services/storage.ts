@@ -70,7 +70,6 @@ const mapBannerToDb = (b: Banner, index: number) => ({
   link: b.link || '',
   button_text: b.buttonText || '',
   type: b.type || 'image',
-  price: b.price || '',
   sort_order: index,
   updated_at: new Date().toISOString()
 });
@@ -96,7 +95,6 @@ const mapVideoToDb = (v: VideoCard, index: number) => ({
   buy_button_text: v.buyButtonText || '',
   telegram_link: v.telegramLink || '',
   telegram_button_text: v.telegramButtonText || '',
-  price: v.price || '',
   sort_order: index,
   updated_at: new Date().toISOString()
 });
@@ -143,7 +141,6 @@ const mapPromoToDb = (p: PromoCard, id: string) => ({
   button_text: p.buttonText || '',
   button_link: p.buttonLink || '',
   is_active: p.isActive || false,
-  price: p.price || '',
   updated_at: new Date().toISOString()
 });
 
