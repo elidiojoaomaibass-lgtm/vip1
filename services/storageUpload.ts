@@ -15,6 +15,13 @@ export const uploadService = {
   },
 
   /**
+   * Upload de foto
+   */
+  uploadPhoto: async (file: File): Promise<UploadResult> => {
+    return uploadService.uploadFile(file, 'photos');
+  },
+
+  /**
    * Upload de capa de vídeo
    */
   uploadVideoCover: async (file: File): Promise<UploadResult> => {

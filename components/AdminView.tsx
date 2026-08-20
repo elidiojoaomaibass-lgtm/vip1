@@ -1,6 +1,6 @@
 
 import React, { useState } from 'react';
-import { Banner, VideoCard, PromoCard, Notice } from '../types';
+import { Banner, VideoCard, PromoCard, Notice, PhotoCard } from '../types';
 import { uploadService } from '../services/storageUpload';
 import { storageService } from '../services/storage';
 import { checkConnection, isSupabaseConfigured } from '../services/supabase';
@@ -29,6 +29,8 @@ interface Props {
   setBanners: (banners: Banner[]) => void;
   videos: VideoCard[];
   setVideos: (videos: VideoCard[]) => void;
+  photos: PhotoCard[];
+  setPhotos: (photos: PhotoCard[]) => void;
   promoCard: PromoCard;
   setPromoCard: (promo: PromoCard) => void;
   bottomPromoCard: PromoCard;
@@ -42,12 +44,13 @@ interface Props {
 export const AdminView: React.FC<Props> = ({
   banners, setBanners,
   videos, setVideos,
+  photos, setPhotos,
   promoCard, setPromoCard,
   bottomPromoCard, setBottomPromoCard,
   notices, setNotices,
   onBack, isDarkMode
 }) => {
-  const [tab, setTab] = useState<'banners' | 'videos' | 'notices' | 'promo'>('banners');
+  const [tab, setTab] = useState<'banners' | 'videos' | 'photos' | 'notices' | 'promo'>('banners');
   const [showAddModal, setShowAddModal] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [isUploading, setIsUploading] = useState(false);
@@ -71,11 +74,14 @@ export const AdminView: React.FC<Props> = ({
   const [formVideo, setFormVideo] = useState<Partial<VideoCard>>({
     title: '', coverUrl: '', previews: [''], buyLink: '', buyButtonText: 'BUY ALL PACK', telegramLink: '', telegramButtonText: 'DM TELEGRAM', price: ''
   });
+  const [formPhoto, setFormPhoto] = useState<Partial<PhotoCard>>({
+    title: '', photoUrl: '', description: '', buyLink: '', buyButtonText: 'BUY ALL PACK', telegramLink: '', telegramButtonText: 'DM TELEGRAM', price: ''
+  });
   const [formNotice, setFormNotice] = useState<Partial<Notice>>({
     title: '', content: '', date: new Date().toLocaleDateString('pt-BR')
   });
 
-  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>, target: 'banner' | 'video-cover' | number) => {
+  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>, target: 'banner' | 'video-cover' | 'photo-url' | number) => {
     const file = event.target.files?.[0];
     if (!file) return;
 
@@ -104,8 +110,8 @@ export const AdminView: React.FC<Props> = ({
             return;
           }
         }
-      } else if (target === 'video-cover') {
-        // Capas de vídeo são sempre imagens
+      } else if (target === 'video-cover' || target === 'photo-url') {
+        // Capas de vídeo e fotos são sempre imagens
         const validation = uploadService.validateImage(file);
         if (!validation.valid) {
           alert(validation.error);
@@ -133,6 +139,8 @@ export const AdminView: React.FC<Props> = ({
         result = await uploadService.uploadBannerImage(file);
       } else if (target === 'video-cover') {
         result = await uploadService.uploadVideoCover(file);
+      } else if (target === 'photo-url') {
+        result = await uploadService.uploadPhoto(file);
       } else {
         result = await uploadService.uploadVideoPreview(file);
       }
@@ -159,6 +167,10 @@ export const AdminView: React.FC<Props> = ({
       } else if (target === 'video-cover') {
         const oldUrl = formVideo.coverUrl;
         setFormVideo(p => ({ ...p, coverUrl: result.url! }));
+        if (oldUrl) await uploadService.deleteFileByUrl(oldUrl);
+      } else if (target === 'photo-url') {
+        const oldUrl = formPhoto.photoUrl;
+        setFormPhoto(p => ({ ...p, photoUrl: result.url! }));
         if (oldUrl) await uploadService.deleteFileByUrl(oldUrl);
       } else if (typeof target === 'number') {
         const newPreviews = [...(formVideo.previews || ['', '', ''])];
@@ -200,6 +212,15 @@ export const AdminView: React.FC<Props> = ({
       setVideos(newVideos);
       result = await storageService.saveVideos(newVideos);
 
+    } else if (tab === 'photos') {
+      if (!formPhoto.photoUrl) return;
+      let newPhotos;
+      if (editingId) newPhotos = photos.map(p => p.id === editingId ? { ...p, ...formPhoto } as PhotoCard : p);
+      else newPhotos = [...photos, { id: crypto.randomUUID(), title: formPhoto.title || 'Premium Photo', photoUrl: formPhoto.photoUrl!, description: formPhoto.description || '', buyLink: formPhoto.buyLink || '', buyButtonText: formPhoto.buyButtonText || 'BUY ALL PACK', telegramLink: formPhoto.telegramLink || '', telegramButtonText: formPhoto.telegramButtonText || 'DM TELEGRAM', price: formPhoto.price || '' }];
+
+      setPhotos(newPhotos);
+      result = await storageService.savePhotos(newPhotos);
+
     } else if (tab === 'notices') {
       if (!formNotice.title || !formNotice.content) return;
       let newNotices;
@@ -222,6 +243,7 @@ export const AdminView: React.FC<Props> = ({
     setEditingId(null);
     setFormBanner({ images: ['', '', '', '', ''], buttonText: 'Saiba Mais', link: '', type: 'image', price: '' });
     setFormVideo({ title: '', coverUrl: '', previews: [''], buyLink: '', buyButtonText: 'BUY ALL PACK', telegramLink: '', telegramButtonText: 'DM TELEGRAM', price: '' });
+    setFormPhoto({ title: '', photoUrl: '', description: '', buyLink: '', buyButtonText: 'BUY ALL PACK', telegramLink: '', telegramButtonText: 'DM TELEGRAM', price: '' });
     setFormNotice({ title: '', content: '', date: new Date().toLocaleDateString('pt-BR') });
   };
 
@@ -253,10 +275,12 @@ export const AdminView: React.FC<Props> = ({
     setShowAddModal(true);
   };
   const startEditNotice = (n: Notice) => { setEditingId(n.id); setFormNotice({ ...n }); setTab('notices'); setShowAddModal(true); };
+  const startEditPhoto = (p: PhotoCard) => { setEditingId(p.id); setFormPhoto({ ...p }); setTab('photos'); setShowAddModal(true); };
 
-  const navItems: { id: 'banners' | 'videos' | 'notices' | 'promo'; label: string; icon: any; count?: number }[] = [
+  const navItems: { id: 'banners' | 'videos' | 'photos' | 'notices' | 'promo'; label: string; icon: any; count?: number }[] = [
     { id: 'banners', label: 'Banners', icon: ImageIcon, count: banners.length },
     { id: 'videos', label: 'Vídeos', icon: Video, count: videos.length },
+    { id: 'photos', label: 'Fotos', icon: ImageIcon, count: photos.length },
     { id: 'notices', label: 'Avisos', icon: Bell, count: notices.length },
     { id: 'promo', label: 'Promoção', icon: Sparkles },
   ];
@@ -369,6 +393,17 @@ export const AdminView: React.FC<Props> = ({
         title: '',
         coverUrl: '',
         previews: ['', '', ''],
+        buyLink: '',
+        buyButtonText: 'BUY ALL PACK',
+        telegramLink: '',
+        telegramButtonText: 'DM TELEGRAM',
+        price: ''
+      });
+    } else if (tab === 'photos') {
+      setFormPhoto({
+        title: '',
+        photoUrl: '',
+        description: '',
         buyLink: '',
         buyButtonText: 'BUY ALL PACK',
         telegramLink: '',
@@ -508,7 +543,29 @@ export const AdminView: React.FC<Props> = ({
                 </div>
               </div>
               <h4 className={`text-sm font-black uppercase ${isDarkMode ? 'text-white' : 'text-zinc-900'}`}>{v.title || 'Untitled Pack'}</h4>
-              <p className="text-[10px] text-zinc-500 font-bold mt-1 uppercase tracking-widest">{(v.previews || []).length} Vídeo de Preview</p>
+            </div>
+          ))}
+
+          {tab === 'photos' && photos.map((p) => (
+            <div key={p.id} className={`group relative p-4 rounded-xl border transition-all ${isDarkMode ? 'border-zinc-800 bg-zinc-950/40 hover:bg-zinc-900/60' : 'border-zinc-200 bg-white shadow-sm'}`}>
+              <div className="aspect-[3/4] rounded-xl overflow-hidden mb-4 relative">
+                <img
+                  src={p.photoUrl}
+                  className="w-full h-full object-cover"
+                  onError={(e) => {
+                    e.currentTarget.src = 'https://placehold.co/600x800/1e1e1e/FFF?text=Photo+Error';
+                    e.currentTarget.parentElement?.classList.add('border-2', 'border-red-500');
+                  }}
+                />
+                <div className="absolute bottom-0 left-0 right-0 bg-black/80 px-2 py-1">
+                  <p className="text-[8px] text-zinc-400 truncate">{p.photoUrl}</p>
+                </div>
+                <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
+                  <button onClick={() => startEditPhoto(p)} className="p-3 bg-white text-zinc-900 rounded-full hover:scale-110 transition-transform"><Edit2 size={20} /></button>
+                  <button onClick={async () => { if (confirm('Excluir foto?')) { await storageService.deletePhoto(p.id); setPhotos(photos.filter(x => x.id !== p.id)); } }} className="p-3 bg-violet-600 text-white rounded-full hover:scale-110 transition-transform"><Trash2 size={20} /></button>
+                </div>
+              </div>
+              <h4 className={`text-sm font-black uppercase ${isDarkMode ? 'text-white' : 'text-zinc-900'}`}>{p.title || 'Untitled Photo'}</h4>
             </div>
           ))}
 

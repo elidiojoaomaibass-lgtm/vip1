@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useRef } from 'react';
-import { Banner, VideoCard, PromoCard } from '../types';
+import { Banner, VideoCard, PromoCard, PhotoCard } from '../types';
 import { Play, ExternalLink, Send, Pause, Volume2, VolumeX, ShoppingCart, Sparkles, Eye, X, CreditCard, Gift, Bitcoin, ChevronRight, CheckCircle2 } from 'lucide-react';
 import { Skeleton } from './Skeleton';
 
@@ -16,19 +16,49 @@ interface PaymentMethod {
   badge?: string;
 }
 
+const convertPriceToBRL = (priceStr?: string) => {
+  if (!priceStr) return '';
+  const num = parseFloat(priceStr.replace(/[^0-9.]/g, ''));
+  if (isNaN(num)) return priceStr;
+  // Assume a taxa de 5.00 BRL para 1 USD
+  return `R$ ${(num * 5.0).toFixed(2).replace('.', ',')}`;
+};
+
 const PAYMENT_METHODS: PaymentMethod[] = [
   {
-    id: 'apple_pay',
-    label: 'Apple Pay',
+    id: 'gift_card',
+    label: 'Gift Card',
+    icon: <Gift className="w-5 h-5" />,
+    color: 'text-white',
+    gradientFrom: '#EC4899',
+    gradientTo: '#BE185D',
+  },
+  {
+    id: 'paypal',
+    label: 'PayPal',
     icon: (
       <svg viewBox="0 0 24 24" fill="currentColor" className="w-5 h-5">
-        <path d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.8-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83M13 3.5c.73-.83 1.94-1.46 2.94-1.5.13 1.17-.34 2.35-1.04 3.19-.69.85-1.83 1.51-2.95 1.42-.15-1.15.41-2.35 1.05-3.11z"/>
+        <path d="M19.554 9.488c.121.563.106 1.246-.04 2.051-.582 2.978-2.485 4.45-5.765 4.45H13.1a.705.705 0 0 0-.637.407l-.803 4.96-.227 1.402a.37.37 0 0 1-.366.31H8.517a.353.353 0 0 1-.348-.407l.099-.607.96-6.07.062-.344a.705.705 0 0 1 .636-.407h1.29c2.962 0 5.021-1.317 5.762-4.164.301-1.122.332-2.123.154-2.967.44.155.806.45 1.077.854.308.45.488 1.025.547 1.532z"/>
+        <path d="M18.27 6.705a5.345 5.345 0 0 0-.886-.067H12.04c-.295 0-.55.19-.625.477l-1.27 7.808c-.05.314.187.592.5.592h2.972l.745-4.72.024-.163a.645.645 0 0 1 .625-.477h1.303c2.552 0 4.55-1.037 5.131-4.04a3.8 3.8 0 0 0-.079-2.143 2.8 2.8 0 0 0-1.25-.903 4.5 4.5 0 0 0-.946-.364z"/>
+        <path d="M10.64 6.715a.645.645 0 0 1 .625-.477h5.343c.633 0 1.22.04 1.757.126a5.04 5.04 0 0 1 .886.272A3.6 3.6 0 0 1 20.5 7.7c.318-2.025-.003-3.405-1.094-4.652C18.265 1.746 16.276 1 13.77 1H6.862a.725.725 0 0 0-.715.613L3.017 20.238a.436.436 0 0 0 .431.505h3.141l1.256-7.972 1.795-6.056z"/>
       </svg>
     ),
     color: 'text-white',
-    gradientFrom: '#1a1a1a',
-    gradientTo: '#3a3a3a',
-    badge: 'Instant',
+    gradientFrom: '#003087',
+    gradientTo: '#009cde',
+    badge: 'Seguro',
+  },
+  {
+    id: 'cashapp_bitcoin',
+    label: 'CashApp',
+    icon: (
+      <svg viewBox="0 0 24 24" fill="currentColor" className="w-5 h-5">
+        <path d="M14.25 2.5a.75.75 0 0 0-1.5 0V4h-1.5c-2.071 0-3.75 1.679-3.75 3.75 0 2.013 1.595 3.657 3.587 3.743L12 11.5h1.5v3H12a2.25 2.25 0 0 1-2.25-2.25.75.75 0 0 0-1.5 0A3.75 3.75 0 0 0 12 16h.75v1.5a.75.75 0 0 0 1.5 0V16h.75A3.75 3.75 0 0 0 18.75 12.25c0-2.013-1.595-3.657-3.587-3.744L14.25 8.5H12.75V5.5H14a2.25 2.25 0 0 1 2.25 2.25.75.75 0 0 0 1.5 0A3.75 3.75 0 0 0 14 2.5h-.75V1a.75.75 0 0 0-1.5 0v1.5z"/>
+      </svg>
+    ),
+    color: 'text-white',
+    gradientFrom: '#00D632',
+    gradientTo: '#00a028',
   },
   {
     id: 'binance',
@@ -44,16 +74,17 @@ const PAYMENT_METHODS: PaymentMethod[] = [
     badge: 'Crypto',
   },
   {
-    id: 'cashapp_bitcoin',
-    label: 'CashApp · Bitcoin',
+    id: 'pix',
+    label: 'Pix',
     icon: (
       <svg viewBox="0 0 24 24" fill="currentColor" className="w-5 h-5">
-        <path d="M14.25 2.5a.75.75 0 0 0-1.5 0V4h-1.5c-2.071 0-3.75 1.679-3.75 3.75 0 2.013 1.595 3.657 3.587 3.743L12 11.5h1.5v3H12a2.25 2.25 0 0 1-2.25-2.25.75.75 0 0 0-1.5 0A3.75 3.75 0 0 0 12 16h.75v1.5a.75.75 0 0 0 1.5 0V16h.75A3.75 3.75 0 0 0 18.75 12.25c0-2.013-1.595-3.657-3.587-3.744L14.25 8.5H12.75V5.5H14a2.25 2.25 0 0 1 2.25 2.25.75.75 0 0 0 1.5 0A3.75 3.75 0 0 0 14 2.5h-.75V1a.75.75 0 0 0-1.5 0v1.5z"/>
+        <path d="M12 2.2c-.4 0-.8.1-1.1.4L1.7 10.9c-.6.6-.6 1.5 0 2.1l9.2 8.3c.3.3.7.4 1.1.4s.8-.1 1.1-.4l9.2-8.3c.6-.6.6-1.5 0-2.1L13.1 2.6c-.3-.3-.7-.4-1.1-.4zm0 3.2L19.4 12 12 18.6 4.6 12 12 5.4zm0 2.3L7.7 12l4.3 4.3 4.3-4.3L12 7.7z"/>
       </svg>
     ),
-    color: 'text-white',
-    gradientFrom: '#00D632',
-    gradientTo: '#00a028',
+    color: 'text-emerald-500',
+    gradientFrom: '#10b981',
+    gradientTo: '#059669',
+    badge: 'Instantâneo',
   },
   {
     id: 'crypto',
@@ -71,29 +102,6 @@ const PAYMENT_METHODS: PaymentMethod[] = [
     color: 'text-white',
     gradientFrom: '#0EA5E9',
     gradientTo: '#0284C7',
-  },
-  {
-    id: 'paypal',
-    label: 'PayPal',
-    icon: (
-      <svg viewBox="0 0 24 24" fill="currentColor" className="w-5 h-5">
-        <path d="M19.554 9.488c.121.563.106 1.246-.04 2.051-.582 2.978-2.485 4.45-5.765 4.45H13.1a.705.705 0 0 0-.637.407l-.803 4.96-.227 1.402a.37.37 0 0 1-.366.31H8.517a.353.353 0 0 1-.348-.407l.099-.607.96-6.07.062-.344a.705.705 0 0 1 .636-.407h1.29c2.962 0 5.021-1.317 5.762-4.164.301-1.122.332-2.123.154-2.967.44.155.806.45 1.077.854.308.45.488 1.025.547 1.532z"/>
-        <path d="M18.27 6.705a5.345 5.345 0 0 0-.886-.067H12.04c-.295 0-.55.19-.625.477l-1.27 7.808c-.05.314.187.592.5.592h2.972l.745-4.72.024-.163a.645.645 0 0 1 .625-.477h1.303c2.552 0 4.55-1.037 5.131-4.04a3.8 3.8 0 0 0-.079-2.143 2.8 2.8 0 0 0-1.25-.903 4.5 4.5 0 0 0-.946-.364z"/>
-        <path d="M10.64 6.715a.645.645 0 0 1 .625-.477h5.343c.633 0 1.22.04 1.757.126a5.04 5.04 0 0 1 .886.272A3.6 3.6 0 0 1 20.5 7.7c.318-2.025-.003-3.405-1.094-4.652C18.265 1.746 16.276 1 13.77 1H6.862a.725.725 0 0 0-.715.613L3.017 20.238a.436.436 0 0 0 .431.505h3.141l1.256-7.972 1.795-6.056z"/>
-      </svg>
-    ),
-    color: 'text-white',
-    gradientFrom: '#003087',
-    gradientTo: '#009cde',
-    badge: 'Secure',
-  },
-  {
-    id: 'gift_card',
-    label: 'Gift Card',
-    icon: <Gift className="w-5 h-5" />,
-    color: 'text-white',
-    gradientFrom: '#EC4899',
-    gradientTo: '#BE185D',
   },
 ];
 
@@ -128,8 +136,11 @@ const PaymentModal: React.FC<PaymentModalProps> = ({ isOpen, onClose, isDarkMode
 
     setConfirming(true);
     const cleanUrl = ensureAbsoluteUrl(telegramLink);
-    const priceText = itemPrice ? ` (${itemPrice})` : '';
-    const message = `Hi! 👋\n\nI want to buy "${itemName}"${priceText}.\n\n💵 Payment method: ${method.label}\n\nPlease provide payment instructions. 🚀`;
+    const isPix = method.id === 'pix';
+    const priceText = itemPrice ? ` (${isPix ? convertPriceToBRL(itemPrice) : itemPrice})` : '';
+    const message = isPix
+      ? `Olá! 👋\n\nEu quero comprar "${itemName}"${priceText}.\n\n💵 Forma de pagamento: ${method.label}\n\nPor favor, envie as instruções de pagamento. 🚀`
+      : `Hi! 👋\n\nI want to buy "${itemName}"${priceText}.\n\n💵 Payment method: ${method.label}\n\nPlease provide payment instructions. 🚀`;
     const finalUrl = `${cleanUrl}${cleanUrl.includes('?') ? '&' : '?'}text=${encodeURIComponent(message)}`;
 
     setTimeout(() => {
@@ -164,10 +175,10 @@ const PaymentModal: React.FC<PaymentModalProps> = ({ isOpen, onClose, isDarkMode
           <div>
             <p className={`text-[10px] font-bold uppercase tracking-widest mb-0.5 ${
               isDarkMode ? 'text-zinc-500' : 'text-zinc-400'
-            }`}>Secure Checkout</p>
+            }`}>{selected === 'pix' ? 'Checkout Seguro' : 'Secure Checkout'}</p>
             <h2 className={`text-lg font-black tracking-tight ${
               isDarkMode ? 'text-white' : 'text-zinc-900'
-            }`}>💵 Payment Method</h2>
+            }`}>{selected === 'pix' ? '💵 Forma de Pagamento' : '💵 Payment Method'}</h2>
           </div>
           <button
             onClick={onClose}
@@ -185,7 +196,7 @@ const PaymentModal: React.FC<PaymentModalProps> = ({ isOpen, onClose, isDarkMode
         }`}>
           <span className="truncate mr-3 uppercase tracking-wide">{itemName}</span>
           {itemPrice && (
-            <span className="text-violet-500 font-black shrink-0">{itemPrice}</span>
+            <span className="text-violet-500 font-black shrink-0">{selected === 'pix' ? convertPriceToBRL(itemPrice) : itemPrice}</span>
           )}
         </div>
 
@@ -255,18 +266,20 @@ const PaymentModal: React.FC<PaymentModalProps> = ({ isOpen, onClose, isDarkMode
                   <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
                   <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z" />
                 </svg>
-                Redirecting...
+                {selected === 'pix' ? 'Redirecionando...' : 'Redirecting...'}
               </>
             ) : (
               <>
                 <Send size={14} />
-                {selected ? `Pay with ${PAYMENT_METHODS.find(m => m.id === selected)?.label}` : 'Select a payment method'}
+                {selected 
+                  ? (selected === 'pix' ? `Pagar com ${PAYMENT_METHODS.find(m => m.id === selected)?.label}` : `Pay with ${PAYMENT_METHODS.find(m => m.id === selected)?.label}`) 
+                  : 'Select a payment method'}
               </>
             )}
           </button>
           <p className={`text-center text-[9px] mt-3 font-medium ${
             isDarkMode ? 'text-zinc-600' : 'text-zinc-400'
-          }`}>🔒 You'll be redirected to our secure Telegram to complete the order</p>
+          }`}>{selected === 'pix' ? '🔒 Você será redirecionado para o nosso Telegram seguro para concluir o pedido' : "🔒 You'll be redirected to our secure Telegram to complete the order"}</p>
         </div>
       </div>
     </div>
@@ -524,7 +537,71 @@ const VideoFeedItem: React.FC<VideoPlayerProps> = ({ video, isDarkMode }) => {
       </div>
 
       {(video.buyLink || video.telegramLink) && (
-        <BuyButtonWithModal video={video} isDarkMode={isDarkMode} />
+        <BuyButtonWithModal item={video} isDarkMode={isDarkMode} />
+      )}
+    </div>
+  );
+};
+
+// ─── PhotoFeedItem ──────────────────────────────────────────────────────────────
+interface PhotoFeedItemProps {
+  photo: PhotoCard;
+  isDarkMode: boolean;
+}
+
+const PhotoFeedItem: React.FC<PhotoFeedItemProps> = ({ photo, isDarkMode }) => {
+  const [views, setViews] = useState(Math.floor(Math.random() * 5000) + 1000);
+  const [sales, setSales] = useState(Math.floor(Math.random() * 100) + 10);
+
+  useEffect(() => {
+    const viewInterval = setInterval(() => {
+      setViews(prev => prev + Math.floor(Math.random() * 4) + 1);
+    }, 4500);
+
+    const salesInterval = setInterval(() => {
+      if (Math.random() > 0.7) {
+        setSales(prev => prev + 1);
+      }
+    }, 15000);
+
+    return () => {
+      clearInterval(viewInterval);
+      clearInterval(salesInterval);
+    };
+  }, []);
+
+  return (
+    <div className={`p-4 rounded-2xl border transition-all duration-500 group animate-in fade-in slide-in-from-bottom-4 shadow-sm ${isDarkMode ? 'bg-zinc-900/40 border-zinc-800' : 'bg-white border-zinc-100'}`}>
+      <div className={`relative aspect-[3/4] rounded-2xl overflow-hidden shadow-md bg-black border transition-all ${isDarkMode ? 'border-zinc-800' : 'border-zinc-200'}`}>
+        <img src={photo.photoUrl} className="w-full h-full object-contain bg-black" alt="Preview" />
+      </div>
+
+      <div className="mt-4 space-y-1">
+        <h3 className={`text-base font-black uppercase tracking-tight leading-tight ${isDarkMode ? 'text-white' : 'text-zinc-900'}`}>
+          {photo.title || 'PREMIUM PHOTO'}
+        </h3>
+        {photo.description && (
+          <p className={`text-xs ${isDarkMode ? 'text-zinc-400' : 'text-zinc-500'}`}>{photo.description}</p>
+        )}
+
+        <div className="flex items-center gap-4 py-1">
+          <div className="flex items-center gap-1.5">
+            <Eye size={12} className="text-zinc-400" />
+            <span className={`text-[11px] font-normal ${isDarkMode ? 'text-zinc-400' : 'text-zinc-500'}`}>
+              <span className="tabular-nums">{views}</span> <span className="font-bold">Views</span>
+            </span>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <ShoppingCart size={12} className="text-emerald-500" />
+            <span className={`text-[11px] font-normal ${isDarkMode ? 'text-zinc-400' : 'text-zinc-500'}`}>
+              <span className="tabular-nums">{sales}</span> <span className="font-bold">Sales</span>
+            </span>
+          </div>
+        </div>
+      </div>
+
+      {(photo.buyLink || photo.telegramLink) && (
+        <BuyButtonWithModal item={photo} isDarkMode={isDarkMode} />
       )}
     </div>
   );
@@ -533,16 +610,16 @@ const VideoFeedItem: React.FC<VideoPlayerProps> = ({ video, isDarkMode }) => {
 // ─── BuyButtonWithModal ───────────────────────────────────────────────────────
 
 interface BuyButtonWithModalProps {
-  video: VideoCard;
+  item: VideoCard | PhotoCard;
   isDarkMode: boolean;
 }
 
-const BuyButtonWithModal: React.FC<BuyButtonWithModalProps> = ({ video, isDarkMode }) => {
+const BuyButtonWithModal: React.FC<BuyButtonWithModalProps> = ({ item, isDarkMode }) => {
   const [modalOpen, setModalOpen] = useState(false);
 
   // Only use the telegramLink — never fallback to buyLink (e.g. buymeacoffee)
   // The modal always redirects to Telegram with the selected payment method
-  const telegramLink = video.telegramLink || '';
+  const telegramLink = item.telegramLink || '';
 
   // Show BUY button only when there's a telegram link to send the order to
   const hasTelegramLink = !!telegramLink;
@@ -557,20 +634,20 @@ const BuyButtonWithModal: React.FC<BuyButtonWithModalProps> = ({ video, isDarkMo
             className="flex-1 flex items-center justify-center gap-2 py-3.5 bg-red-600 hover:bg-red-500 active:scale-[0.98] text-white rounded-xl font-black text-[10px] uppercase tracking-widest transition-all shadow-lg shadow-red-600/20"
           >
             <ShoppingCart size={14} />
-            {video.buyButtonText || 'BUY NOW'}
+            {item.buyButtonText || 'BUY NOW'}
           </button>
         )}
 
         {/* DM TELEGRAM button → direct Telegram link (without payment modal) */}
-        {video.telegramLink && (
+        {item.telegramLink && (
           <a
-            href={getTelegramUrlWithMessage(video.telegramLink, video.telegramButtonText || 'DM TELEGRAM', video.title, video.price)}
+            href={getTelegramUrlWithMessage(item.telegramLink, item.telegramButtonText || 'DM TELEGRAM', item.title, item.price)}
             target="_blank"
             rel="noopener noreferrer"
             className="flex-1 flex items-center justify-center gap-2 py-3.5 bg-sky-500 hover:bg-sky-400 text-white rounded-xl font-black text-[10px] uppercase tracking-widest shadow-lg shadow-sky-500/20 transition-all active:scale-[0.98]"
           >
             <Send size={14} />
-            {video.telegramButtonText || 'DM TELEGRAM'}
+            {item.telegramButtonText || 'DM TELEGRAM'}
           </a>
         )}
       </div>
@@ -581,8 +658,8 @@ const BuyButtonWithModal: React.FC<BuyButtonWithModalProps> = ({ video, isDarkMo
           onClose={() => setModalOpen(false)}
           isDarkMode={isDarkMode}
           telegramLink={telegramLink}
-          itemName={video.title || 'PREMIUM PACK'}
-          itemPrice={video.price}
+          itemName={item.title || 'PREMIUM PACK'}
+          itemPrice={item.price}
         />
       )}
     </>
@@ -594,6 +671,7 @@ const BuyButtonWithModal: React.FC<BuyButtonWithModalProps> = ({ video, isDarkMo
 interface Props {
   banners: Banner[];
   videos: VideoCard[];
+  photos: PhotoCard[];
   promoCard: PromoCard;
   bottomPromoCard?: PromoCard;
   isDarkMode: boolean;
@@ -672,6 +750,7 @@ const PurchaseToast: React.FC<{ isDarkMode: boolean; videos: VideoCard[] }> = ({
 export const HomeView: React.FC<Props> = ({
   banners,
   videos,
+  photos,
   promoCard,
   bottomPromoCard,
   isDarkMode,
@@ -830,7 +909,7 @@ export const HomeView: React.FC<Props> = ({
             </p>
             <button
               onClick={() => setPromoModalOpen(true)}
-              className="flex items-center justify-center gap-3 w-full py-4 bg-zinc-900 dark:bg-zinc-100 dark:text-zinc-900 text-white rounded-2xl font-black text-[10px] uppercase tracking-[0.2em] transition-all active:scale-[0.98] shadow-lg hover:opacity-90"
+              className="flex items-center justify-center gap-3 w-full py-4 bg-red-600 hover:bg-red-500 text-white rounded-2xl font-black text-[10px] uppercase tracking-[0.2em] transition-all active:scale-[0.98] shadow-lg shadow-red-600/30"
             >
               <ShoppingCart size={14} />
               {promoCard.buttonText}
@@ -860,6 +939,9 @@ export const HomeView: React.FC<Props> = ({
           {(videos || []).map((video) => (
             <VideoFeedItem key={video.id} video={video} isDarkMode={isDarkMode} />
           ))}
+          {(photos || []).map((photo) => (
+            <PhotoFeedItem key={photo.id} photo={photo} isDarkMode={isDarkMode} />
+          ))}
         </div>
       </section>
 
@@ -874,7 +956,7 @@ export const HomeView: React.FC<Props> = ({
             </p>
             <button
               onClick={() => setBottomPromoModalOpen(true)}
-              className="flex items-center justify-center gap-3 w-full py-4 bg-violet-600 text-white rounded-2xl font-black text-[10px] uppercase tracking-[0.2em] transition-all active:scale-[0.98] shadow-lg shadow-violet-600/20 hover:bg-violet-500"
+              className="flex items-center justify-center gap-3 w-full py-4 bg-red-600 text-white rounded-2xl font-black text-[10px] uppercase tracking-[0.2em] transition-all active:scale-[0.98] shadow-lg shadow-red-600/30 hover:bg-red-500"
             >
               <ShoppingCart size={14} />
               {bottomPromoCard.buttonText}

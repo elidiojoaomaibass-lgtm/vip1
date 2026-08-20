@@ -37,4 +37,16 @@ export interface VideoCard {
   price?: string;
 }
 
-export type View = 'home' | 'admin' | 'video-detail' | 'notice' | 'login';
+export interface PhotoCard {
+  id: string;
+  title?: string;
+  photoUrl: string;
+  description?: string;
+  buyLink?: string;
+  buyButtonText?: string;
+  telegramLink?: string;
+  telegramButtonText?: string;
+  price?: string;
+}
+
+export type View = 'home' | 'admin' | 'video-detail' | 'photo-detail' | 'notice' | 'login';

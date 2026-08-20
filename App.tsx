@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { Banner, VideoCard, View, PromoCard, Notice } from './types';
+import { Banner, VideoCard, View, PromoCard, Notice, PhotoCard } from './types';
 import { storageService } from './services/storage';
 import { authService } from './services/auth';
 import { HomeView } from './components/HomeView';
@@ -27,6 +27,7 @@ const App: React.FC = () => {
 
   const [banners, setBanners] = useState<Banner[]>([]);
   const [videos, setVideos] = useState<VideoCard[]>([]);
+  const [photos, setPhotos] = useState<PhotoCard[]>([]);
   const [notices, setNotices] = useState<Notice[]>([]);
   const [promoCard, setPromoCard] = useState<PromoCard>({ title: '', description: '', buttonText: '', buttonLink: '', isActive: false });
   const [bottomPromoCard, setBottomPromoCard] = useState<PromoCard>({ title: '', description: '', buttonText: '', buttonLink: '', isActive: false });
@@ -47,15 +48,17 @@ const App: React.FC = () => {
     const initData = async () => {
       setIsLoadingData(true);
       try {
-        const [b, v, pTop, pBottom, n] = await Promise.all([
+        const [b, v, p, pTop, pBottom, n] = await Promise.all([
           storageService.getBanners(),
           storageService.getVideos(),
+          storageService.getPhotos(),
           storageService.getPromoCard(),
           storageService.getBottomPromoCard(),
           storageService.getNotices()
         ]);
         setBanners(b);
         setVideos(v);
+        setPhotos(p);
         setPromoCard(pTop);
         setBottomPromoCard(pBottom);
         setNotices(n);
@@ -76,6 +79,9 @@ const App: React.FC = () => {
       },
       onVideosChange: (newVideos) => {
         setVideos(newVideos);
+      },
+      onPhotosChange: (newPhotos) => {
+        setPhotos(newPhotos);
       },
       onNoticesChange: (newNotices) => {
         setNotices(newNotices);
@@ -107,6 +113,11 @@ const App: React.FC = () => {
   const handleUpdateVideos = (newVideos: VideoCard[]) => {
     setVideos(newVideos);
     storageService.saveVideos(newVideos);
+  };
+
+  const handleUpdatePhotos = (newPhotos: PhotoCard[]) => {
+    setPhotos(newPhotos);
+    storageService.savePhotos(newPhotos);
   };
 
   const handleUpdateNotices = (newNotices: Notice[]) => {
@@ -201,6 +212,7 @@ const App: React.FC = () => {
                     <HomeView 
                       banners={banners} 
                       videos={videos} 
+                      photos={photos}
                       promoCard={promoCard}
                       bottomPromoCard={bottomPromoCard}
                       isDarkMode={isDarkMode}
@@ -226,6 +238,8 @@ const App: React.FC = () => {
                       setBanners={handleUpdateBanners} 
                       videos={videos} 
                       setVideos={handleUpdateVideos} 
+                      photos={photos}
+                      setPhotos={handleUpdatePhotos}
                       promoCard={promoCard}
                       setPromoCard={handleUpdatePromo}
                       bottomPromoCard={bottomPromoCard}

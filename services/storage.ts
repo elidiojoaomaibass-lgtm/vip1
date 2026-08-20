@@ -1,10 +1,11 @@
 
-import { Banner, VideoCard, PromoCard, Notice } from '../types';
+import { Banner, VideoCard, PromoCard, Notice, PhotoCard } from '../types';
 import { supabase } from './supabase';
 import { uploadService } from './storageUpload';
 
 const BANNERS_KEY = 'vh_banners';
 const VIDEOS_KEY = 'vh_videos';
+const PHOTOS_KEY = 'vh_photos';
 const PROMO_KEY = 'vh_promo';
 const BOTTOM_PROMO_KEY = 'vh_bottom_promo';
 const NOTICES_KEY = 'vh_notices';
@@ -12,6 +13,7 @@ const NOTICES_KEY = 'vh_notices';
 // Dados vazios para produção
 const DEFAULT_BANNERS: Banner[] = [];
 const DEFAULT_VIDEOS: VideoCard[] = [];
+const DEFAULT_PHOTOS: PhotoCard[] = [];
 const DEFAULT_NOTICES: Notice[] = [];
 
 const DEFAULT_PROMO: PromoCard = {
@@ -109,6 +111,34 @@ const mapVideoFromDb = (v: any): VideoCard => ({
   telegramLink: v.telegram_link,
   telegramButtonText: v.telegram_button_text,
   price: v.price
+});
+
+/**
+ * Converte Photo para formato DB (Snake Cased)
+ */
+const mapPhotoToDb = (p: PhotoCard, index: number) => ({
+  id: p.id,
+  title: p.title || '',
+  photo_url: p.photoUrl || '',
+  description: p.description || '',
+  buy_link: p.buyLink || '',
+  buy_button_text: p.buyButtonText || '',
+  telegram_link: p.telegramLink || '',
+  telegram_button_text: p.telegramButtonText || '',
+  sort_order: index,
+  updated_at: new Date().toISOString()
+});
+
+const mapPhotoFromDb = (p: any): PhotoCard => ({
+  id: p.id,
+  title: p.title,
+  photoUrl: p.photo_url,
+  description: p.description,
+  buyLink: p.buy_link,
+  buyButtonText: p.buy_button_text,
+  telegramLink: p.telegram_link,
+  telegramButtonText: p.telegram_button_text,
+  price: p.price
 });
 
 /**
@@ -263,6 +293,58 @@ export const storageService = {
         return { synced: true };
       } catch (err: any) {
         console.error("Error saving videos:", err);
+        return { synced: false, error: err.message || 'Unknown error' };
+      }
+    }
+    return { synced: false, error: 'Supabase client not initialized' };
+  },
+
+  // ========== PHOTOS ==========
+  getPhotos: async (): Promise<PhotoCard[]> => {
+    if (supabase) {
+      const { data, error } = await supabase
+        .from('photos')
+        .select('*')
+        .order('sort_order', { ascending: true });
+
+      if (!error && data) {
+        return data.map(mapPhotoFromDb);
+      }
+    }
+    const data = localStorage.getItem(PHOTOS_KEY);
+    const photos = data ? JSON.parse(data) : DEFAULT_PHOTOS;
+    return fixIds(photos, PHOTOS_KEY);
+  },
+
+  savePhotos: async (photos: PhotoCard[]): Promise<{ synced: boolean; error?: string }> => {
+    safeSaveLocal(PHOTOS_KEY, photos);
+
+    if (supabase) {
+      try {
+        const { data: existing, error: fetchError } = await supabase.from('photos').select('id');
+        if (fetchError) return { synced: false, error: fetchError.message };
+
+        const existingIds = existing?.map(p => p.id) || [];
+
+        const payload = photos.map((p, idx) => mapPhotoToDb(p, idx));
+
+        if (payload.length > 0) {
+          const { error } = await supabase.from('photos').upsert(payload, { onConflict: 'id' });
+          if (error) {
+            console.error("Error upserting photos:", error);
+            return { synced: false, error: error.message };
+          }
+        }
+
+        const currentIds = photos.map(p => p.id);
+        const toDelete = existingIds.filter(id => !currentIds.includes(id));
+        if (toDelete.length > 0) {
+          const { error: deleteError } = await supabase.from('photos').delete().in('id', toDelete);
+          if (deleteError) return { synced: false, error: deleteError.message };
+        }
+        return { synced: true };
+      } catch (err: any) {
+        console.error("Error saving photos:", err);
         return { synced: false, error: err.message || 'Unknown error' };
       }
     }
@@ -453,6 +535,28 @@ export const storageService = {
     } catch (e) { }
   },
 
+  deletePhoto: async (id: string) => {
+    if (supabase) {
+      try {
+        const { data } = await supabase.from('photos').select('photo_url').eq('id', id).single();
+        if (data && data.photo_url) {
+          await uploadService.deleteFileByUrl(data.photo_url);
+        }
+        const { error } = await supabase.from('photos').delete().eq('id', id);
+        if (error) console.error("Error deleting photo:", error);
+      } catch (err) {
+        console.error("Error in deletePhoto flow:", err);
+      }
+    }
+    try {
+      const stored = localStorage.getItem(PHOTOS_KEY);
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        safeSaveLocal(PHOTOS_KEY, parsed.filter((p: any) => p.id !== id));
+      }
+    } catch (e) { }
+  },
+
   deleteNotice: async (id: string) => {
     if (supabase) {
       const { error } = await supabase.from('notices').delete().eq('id', id);
@@ -471,6 +575,7 @@ export const storageService = {
   subscribeToChanges: (callbacks: {
     onBannersChange?: (banners: Banner[]) => void;
     onVideosChange?: (videos: VideoCard[]) => void;
+    onPhotosChange?: (photos: PhotoCard[]) => void;
     onNoticesChange?: (notices: Notice[]) => void;
     onPromosChange?: () => void;
   }) => {
@@ -508,6 +613,22 @@ export const storageService = {
         })
         .subscribe();
       channels.push(videosChannel);
+    }
+
+    // Photos subscription
+    if (callbacks.onPhotosChange) {
+      const photosChannel = supabase
+        .channel('photos-changes')
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'photos' }, async () => {
+          const { data } = await supabase.from('photos').select('*').order('sort_order', { ascending: true });
+          if (data) {
+            const mapped = data.map(mapPhotoFromDb);
+            safeSaveLocal(PHOTOS_KEY, mapped);
+            callbacks.onPhotosChange!(mapped);
+          }
+        })
+        .subscribe();
+      channels.push(photosChannel);
     }
 
     // Notices subscription
