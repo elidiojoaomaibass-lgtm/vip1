@@ -162,7 +162,7 @@ const App: React.FC = () => {
   return (
     <div className={`flex justify-center min-h-screen selection:bg-violet-500/30 transition-all duration-500 ${theme.bgMain}`}>
       {/* Container Principal */}
-      <div className={`w-full ${theme.bgFrame} min-h-screen flex flex-col relative overflow-hidden transition-all duration-500`}>
+      <div className={`w-full ${currentView === 'admin' ? 'max-w-6xl' : 'max-w-md'} ${theme.bgFrame} min-h-screen flex flex-col relative overflow-hidden shadow-[0_0_100px_rgba(0,0,0,0.1)] ${isDarkMode ? 'border-zinc-800/50' : 'border-zinc-200/50'} border-x transition-all duration-500`}>
         
         {/* Camada 1: Carregamento Esqueleto (Sempre primeiro) */}
             {/* Conteúdo Principal */}
