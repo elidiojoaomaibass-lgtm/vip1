@@ -638,18 +638,7 @@ const BuyButtonWithModal: React.FC<BuyButtonWithModalProps> = ({ item, isDarkMod
           </button>
         )}
 
-        {/* DM TELEGRAM button → direct Telegram link (without payment modal) */}
-        {item.telegramLink && (
-          <a
-            href={getTelegramUrlWithMessage(item.telegramLink, item.telegramButtonText || 'DM TELEGRAM', item.title, item.price)}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="flex-1 flex items-center justify-center gap-2 py-3.5 bg-sky-500 hover:bg-sky-400 text-white rounded-xl font-black text-[10px] uppercase tracking-widest shadow-lg shadow-sky-500/20 transition-all active:scale-[0.98]"
-          >
-            <Send size={14} />
-            {item.telegramButtonText || 'DM TELEGRAM'}
-          </a>
-        )}
+
       </div>
 
       {hasTelegramLink && (
@@ -909,7 +898,7 @@ export const HomeView: React.FC<Props> = ({
             </p>
             <button
               onClick={() => setPromoModalOpen(true)}
-              className="flex items-center justify-center gap-3 w-full py-4 bg-red-600 hover:bg-red-500 text-white rounded-2xl font-black text-[10px] uppercase tracking-[0.2em] transition-all active:scale-[0.98] shadow-lg shadow-red-600/30"
+              className="flex items-center justify-center gap-3 w-full py-4 bg-sky-500 hover:bg-sky-400 text-white rounded-2xl font-black text-[10px] uppercase tracking-[0.2em] transition-all active:scale-[0.98] shadow-lg shadow-sky-500/30"
             >
               <ShoppingCart size={14} />
               {promoCard.buttonText}
@@ -956,7 +945,7 @@ export const HomeView: React.FC<Props> = ({
             </p>
             <button
               onClick={() => setBottomPromoModalOpen(true)}
-              className="flex items-center justify-center gap-3 w-full py-4 bg-red-600 text-white rounded-2xl font-black text-[10px] uppercase tracking-[0.2em] transition-all active:scale-[0.98] shadow-lg shadow-red-600/30 hover:bg-red-500"
+              className="flex items-center justify-center gap-3 w-full py-4 bg-sky-500 text-white rounded-2xl font-black text-[10px] uppercase tracking-[0.2em] transition-all active:scale-[0.98] shadow-lg shadow-sky-500/30 hover:bg-sky-400"
             >
               <ShoppingCart size={14} />
               {bottomPromoCard.buttonText}
