@@ -7,7 +7,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
 // Email do novo administrador
-const EMAIL = 'kingleakds@gmail.com';
+const EMAIL = 'dzin1850@gmail.com';
 const PASSWORD = 'Albertina198211';
 
 async function setupAdmin() {

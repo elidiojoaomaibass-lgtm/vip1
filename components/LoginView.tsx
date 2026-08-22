@@ -39,6 +39,9 @@ export const LoginView: React.FC<Props> = ({ onLoginSuccess, onBack, isDarkMode 
         // Mostrar tela de 2FA
         setShowTwoFactor(true);
         setIsLoading(false);
+      } else {
+        // Login direto sem 2FA — sucesso!
+        onLoginSuccess();
       }
     } catch (err: any) {
       setError('Erro ao conectar ao servidor');

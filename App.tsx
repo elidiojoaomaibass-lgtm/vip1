@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { Banner, VideoCard, View, PromoCard, Notice, PhotoCard } from './types';
+import { Banner, VideoCard, View, PromoCard, Notice, PhotoCard, GlobalSettings } from './types';
 import { storageService } from './services/storage';
 import { authService } from './services/auth';
 import { HomeView } from './components/HomeView';
@@ -31,6 +31,10 @@ const App: React.FC = () => {
   const [notices, setNotices] = useState<Notice[]>([]);
   const [promoCard, setPromoCard] = useState<PromoCard>({ title: '', description: '', buttonText: '', buttonLink: '', isActive: false });
   const [bottomPromoCard, setBottomPromoCard] = useState<PromoCard>({ title: '', description: '', buttonText: '', buttonLink: '', isActive: false });
+  const [globalSettings, setGlobalSettings] = useState<GlobalSettings>({
+    globalTelegramLink: '',
+    globalTelegramButtonText: 'DM TELEGRAM'
+  });
 
   // Verificar sessão ao carregar
   useEffect(() => {
@@ -48,13 +52,14 @@ const App: React.FC = () => {
     const initData = async () => {
       setIsLoadingData(true);
       try {
-        const [b, v, p, pTop, pBottom, n] = await Promise.all([
+        const [b, v, p, pTop, pBottom, n, gs] = await Promise.all([
           storageService.getBanners(),
           storageService.getVideos(),
           storageService.getPhotos(),
           storageService.getPromoCard(),
           storageService.getBottomPromoCard(),
-          storageService.getNotices()
+          storageService.getNotices(),
+          storageService.getGlobalSettings()
         ]);
         setBanners(b);
         setVideos(v);
@@ -62,6 +67,7 @@ const App: React.FC = () => {
         setPromoCard(pTop);
         setBottomPromoCard(pBottom);
         setNotices(n);
+        setGlobalSettings(gs);
       } catch (error) {
         console.error("Error loading data:", error);
       } finally {
@@ -133,6 +139,26 @@ const App: React.FC = () => {
   const handleUpdateBottomPromo = (newPromo: PromoCard) => {
     setBottomPromoCard(newPromo);
     storageService.saveBottomPromoCard(newPromo);
+  };
+
+  const handleUpdateGlobalSettings = (newSettings: GlobalSettings) => {
+    setGlobalSettings(newSettings);
+    storageService.saveGlobalSettings(newSettings);
+  };
+
+  const handleApplyGlobalTelegramToAllPacks = async (telegramLink: string, buttonText?: string) => {
+    const result = await storageService.applyGlobalTelegramToAllPacks(telegramLink, buttonText);
+    const [v, p] = await Promise.all([
+      storageService.getVideos(),
+      storageService.getPhotos()
+    ]);
+    setVideos(v);
+    setPhotos(p);
+    setGlobalSettings({
+      globalTelegramLink: telegramLink,
+      globalTelegramButtonText: buttonText || 'DM TELEGRAM'
+    });
+    return result;
   };
 
   const theme = {
@@ -215,6 +241,7 @@ const App: React.FC = () => {
                       photos={photos}
                       promoCard={promoCard}
                       bottomPromoCard={bottomPromoCard}
+                      globalSettings={globalSettings}
                       isDarkMode={isDarkMode}
                       isLoading={isLoadingData}
                     />
@@ -238,14 +265,17 @@ const App: React.FC = () => {
                       setBanners={handleUpdateBanners} 
                       videos={videos} 
                       setVideos={handleUpdateVideos} 
-                      photos={photos}
+                      photos={photos} 
                       setPhotos={handleUpdatePhotos}
-                      promoCard={promoCard}
+                      promoCard={promoCard} 
                       setPromoCard={handleUpdatePromo}
-                      bottomPromoCard={bottomPromoCard}
+                      bottomPromoCard={bottomPromoCard} 
                       setBottomPromoCard={handleUpdateBottomPromo}
-                      notices={notices}
+                      notices={notices} 
                       setNotices={handleUpdateNotices}
+                      globalSettings={globalSettings}
+                      setGlobalSettings={handleUpdateGlobalSettings}
+                      onApplyGlobalTelegramToAllPacks={handleApplyGlobalTelegramToAllPacks}
                       onBack={() => setCurrentView('home')} 
                       isDarkMode={isDarkMode} 
                     />

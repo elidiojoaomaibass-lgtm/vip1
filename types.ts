@@ -50,3 +50,8 @@ export interface PhotoCard {
 }
 
 export type View = 'home' | 'admin' | 'video-detail' | 'photo-detail' | 'notice' | 'login';
+
+export interface GlobalSettings {
+  globalTelegramLink: string;
+  globalTelegramButtonText: string;
+}

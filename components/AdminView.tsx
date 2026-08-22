@@ -1,6 +1,6 @@
 
 import React, { useState } from 'react';
-import { Banner, VideoCard, PromoCard, Notice, PhotoCard } from '../types';
+import { Banner, VideoCard, PromoCard, Notice, PhotoCard, GlobalSettings } from '../types';
 import { uploadService } from '../services/storageUpload';
 import { storageService } from '../services/storage';
 import { checkConnection, isSupabaseConfigured } from '../services/supabase';
@@ -21,7 +21,13 @@ import {
   FileUp,
   MousePointer2,
   Layers,
-  Upload
+  Upload,
+  Send,
+  CheckCircle2,
+  Globe,
+  Settings,
+  Zap,
+  Info
 } from 'lucide-react';
 
 interface Props {
@@ -37,6 +43,9 @@ interface Props {
   setBottomPromoCard: (promo: PromoCard) => void;
   notices: Notice[];
   setNotices: (notices: Notice[]) => void;
+  globalSettings?: GlobalSettings;
+  setGlobalSettings?: (settings: GlobalSettings) => void;
+  onApplyGlobalTelegramToAllPacks?: (link: string, buttonText?: string) => Promise<{ synced: boolean; error?: string }>;
   onBack: () => void;
   isDarkMode: boolean;
 }
@@ -48,13 +57,30 @@ export const AdminView: React.FC<Props> = ({
   promoCard, setPromoCard,
   bottomPromoCard, setBottomPromoCard,
   notices, setNotices,
+  globalSettings,
+  setGlobalSettings,
+  onApplyGlobalTelegramToAllPacks,
   onBack, isDarkMode
 }) => {
-  const [tab, setTab] = useState<'banners' | 'videos' | 'photos' | 'notices' | 'promo'>('banners');
+  const [tab, setTab] = useState<'banners' | 'videos' | 'photos' | 'notices' | 'promo' | 'settings'>('banners');
   const [showAddModal, setShowAddModal] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const [connectionStatus, setConnectionStatus] = useState<'checking' | 'connected' | 'offline'>('checking');
+
+  // Telegram Geral State
+  const [globalTelegramLink, setGlobalTelegramLink] = useState(globalSettings?.globalTelegramLink || '');
+  const [globalTelegramButtonText, setGlobalTelegramButtonText] = useState(globalSettings?.globalTelegramButtonText || 'DM TELEGRAM');
+  const [isSavingGlobal, setIsSavingGlobal] = useState(false);
+  const [isApplyingAll, setIsApplyingAll] = useState(false);
+  const [feedbackMessage, setFeedbackMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+
+  React.useEffect(() => {
+    if (globalSettings) {
+      setGlobalTelegramLink(globalSettings.globalTelegramLink || '');
+      setGlobalTelegramButtonText(globalSettings.globalTelegramButtonText || 'DM TELEGRAM');
+    }
+  }, [globalSettings]);
 
   React.useEffect(() => {
     const check = async () => {
@@ -277,12 +303,78 @@ export const AdminView: React.FC<Props> = ({
   const startEditNotice = (n: Notice) => { setEditingId(n.id); setFormNotice({ ...n }); setTab('notices'); setShowAddModal(true); };
   const startEditPhoto = (p: PhotoCard) => { setEditingId(p.id); setFormPhoto({ ...p }); setTab('photos'); setShowAddModal(true); };
 
-  const navItems: { id: 'banners' | 'videos' | 'photos' | 'notices' | 'promo'; label: string; icon: any; count?: number }[] = [
+  const handleSaveGlobalTelegram = async () => {
+    setIsSavingGlobal(true);
+    const newSettings: GlobalSettings = {
+      globalTelegramLink: globalTelegramLink.trim(),
+      globalTelegramButtonText: globalTelegramButtonText.trim() || 'DM TELEGRAM'
+    };
+    if (setGlobalSettings) {
+      setGlobalSettings(newSettings);
+    }
+    const res = await storageService.saveGlobalSettings(newSettings);
+    setIsSavingGlobal(false);
+    if (res.synced) {
+      setFeedbackMessage({
+        type: 'success',
+        text: '✅ Link Geral do Telegram salvo com sucesso! Todos os pacotes sem link individual usarão este link automaticamente.'
+      });
+    } else {
+      setFeedbackMessage({
+        type: 'error',
+        text: '⚠️ Erro ao salvar link geral: ' + (res.error || 'Erro desconhecido')
+      });
+    }
+    setTimeout(() => setFeedbackMessage(null), 5000);
+  };
+
+  const handleApplyToAllPacks = async () => {
+    if (!globalTelegramLink.trim()) {
+      alert('Por favor, informe um Link do Telegram válido antes de aplicar a todas as pastas.');
+      return;
+    }
+    const count = (videos?.length || 0) + (photos?.length || 0);
+    const confirmMessage = `Tem certeza que deseja aplicar o link "${globalTelegramLink.trim()}" a TODOS os ${count} pacotes existentes (vídeos e fotos)?\n\nIsso atualizará os links salvos de cada pack de uma só vez.`;
+    if (!confirm(confirmMessage)) return;
+
+    setIsApplyingAll(true);
+    if (onApplyGlobalTelegramToAllPacks) {
+      const res = await onApplyGlobalTelegramToAllPacks(globalTelegramLink.trim(), globalTelegramButtonText.trim() || 'DM TELEGRAM');
+      setIsApplyingAll(false);
+      if (res.synced) {
+        setFeedbackMessage({
+          type: 'success',
+          text: `⚡ Sucesso! O link do Telegram foi aplicado a todos os ${count} pacotes existentes!`
+        });
+      } else {
+        setFeedbackMessage({
+          type: 'error',
+          text: '⚠️ Erro ao atualizar pacotes: ' + (res.error || 'Erro desconhecido')
+        });
+      }
+    } else {
+      const res = await storageService.applyGlobalTelegramToAllPacks(globalTelegramLink.trim(), globalTelegramButtonText.trim() || 'DM TELEGRAM');
+      const [v, p] = await Promise.all([storageService.getVideos(), storageService.getPhotos()]);
+      setVideos(v);
+      setPhotos(p);
+      setIsApplyingAll(false);
+      if (res.synced) {
+        setFeedbackMessage({
+          type: 'success',
+          text: `⚡ Sucesso! O link do Telegram foi aplicado a todos os ${count} pacotes existentes!`
+        });
+      }
+    }
+    setTimeout(() => setFeedbackMessage(null), 6000);
+  };
+
+  const navItems: { id: 'banners' | 'videos' | 'photos' | 'notices' | 'promo' | 'settings'; label: string; icon: any; count?: number }[] = [
     { id: 'banners', label: 'Banners', icon: ImageIcon, count: banners.length },
     { id: 'videos', label: 'Vídeos', icon: Video, count: videos.length },
     { id: 'photos', label: 'Fotos', icon: ImageIcon, count: photos.length },
     { id: 'notices', label: 'Avisos', icon: Bell, count: notices.length },
     { id: 'promo', label: 'Promoção', icon: Sparkles },
+    { id: 'settings', label: 'Telegram Geral', icon: Send },
   ];
 
   const PromoSection = ({ title, data, onSave, icon: Icon, isDarkMode }: { title: string, data: PromoCard, onSave: (p: PromoCard) => void, icon: any, isDarkMode: boolean }) => {
@@ -469,13 +561,15 @@ export const AdminView: React.FC<Props> = ({
 
         <div className="flex items-center justify-between">
           <div className="flex flex-col">
-            <h2 className={`text-2xl font-black uppercase tracking-tighter ${isDarkMode ? 'text-white' : 'text-zinc-900'}`}>{tab}</h2>
+            <h2 className={`text-2xl font-black uppercase tracking-tighter ${isDarkMode ? 'text-white' : 'text-zinc-900'}`}>
+              {tab === 'settings' ? 'TELEGRAM GERAL' : tab}
+            </h2>
             <div className="flex items-center gap-2 mt-1">
               <span className="w-2 h-2 rounded-full bg-violet-600 animate-pulse"></span>
               <span className="text-[10px] text-zinc-500 font-bold uppercase tracking-widest">Painel de Controle Ativo</span>
             </div>
           </div>
-          {tab !== 'promo' && (
+          {tab !== 'promo' && tab !== 'settings' && (
             <button
               onClick={handleNewItem}
               className="flex items-center gap-3 bg-violet-600 text-white px-6 py-4 rounded-xl text-[10px] font-black shadow-2xl shadow-violet-600/30 active:scale-95 transition-all hover:bg-violet-500"
@@ -485,8 +579,35 @@ export const AdminView: React.FC<Props> = ({
           )}
         </div>
 
+        {/* Global Telegram link indicator for Videos and Photos tabs */}
+        {(tab === 'videos' || tab === 'photos') && (
+          <div className={`p-4 rounded-xl border flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 ${
+            isDarkMode ? 'bg-violet-950/20 border-violet-800/30 text-zinc-300' : 'bg-violet-50/80 border-violet-200 text-zinc-800'
+          }`}>
+            <div className="flex items-center gap-2.5 text-xs font-medium">
+              <div className={`p-1.5 rounded-lg ${isDarkMode ? 'bg-violet-500/20 text-violet-400' : 'bg-violet-100 text-violet-600'}`}>
+                <Send size={14} />
+              </div>
+              <div>
+                <span className="font-bold">Link Geral do Telegram: </span>
+                {globalTelegramLink ? (
+                  <span className="font-mono text-violet-500 font-bold">{globalTelegramLink}</span>
+                ) : (
+                  <span className="italic text-zinc-500">Nenhum definido (Packs sem link individual ficam sem botão ou use a aba Telegram Geral)</span>
+                )}
+              </div>
+            </div>
+            <button
+              onClick={() => setTab('settings')}
+              className="text-[10px] font-black uppercase tracking-wider text-violet-500 hover:text-violet-400 underline underline-offset-4 shrink-0 transition-colors"
+            >
+              Editar Link Geral →
+            </button>
+          </div>
+        )}
+
         {/* Content Grid */}
-        <div className={`grid gap-4 ${tab === 'promo' ? 'grid-cols-1' : 'grid-cols-1 md:grid-cols-2 lg:grid-cols-3'}`}>
+        <div className={`grid gap-4 ${tab === 'promo' || tab === 'settings' ? 'grid-cols-1' : 'grid-cols-1 md:grid-cols-2 lg:grid-cols-3'}`}>
           {tab === 'banners' && banners.map((b) => {
             const firstImage = b.images?.[0] || '';
             const isVideo = firstImage.match(/\.(mp4|webm|mov)(\?.*)?$/i) || (b.type === 'video' && !firstImage.match(/\.(jpg|jpeg|png|gif|webp)(\?.*)?$/i));
@@ -543,6 +664,10 @@ export const AdminView: React.FC<Props> = ({
                 </div>
               </div>
               <h4 className={`text-sm font-black uppercase ${isDarkMode ? 'text-white' : 'text-zinc-900'}`}>{v.title || 'Untitled Pack'}</h4>
+              <div className="mt-2 flex items-center justify-between text-[10px] text-zinc-500">
+                <span>Telegram:</span>
+                <span className="font-mono text-violet-500 truncate max-w-[150px]">{v.telegramLink || (globalTelegramLink ? `(Geral) ${globalTelegramLink}` : 'Sem link')}</span>
+              </div>
             </div>
           ))}
 
@@ -566,6 +691,10 @@ export const AdminView: React.FC<Props> = ({
                 </div>
               </div>
               <h4 className={`text-sm font-black uppercase ${isDarkMode ? 'text-white' : 'text-zinc-900'}`}>{p.title || 'Untitled Photo'}</h4>
+              <div className="mt-2 flex items-center justify-between text-[10px] text-zinc-500">
+                <span>Telegram:</span>
+                <span className="font-mono text-violet-500 truncate max-w-[150px]">{p.telegramLink || (globalTelegramLink ? `(Geral) ${globalTelegramLink}` : 'Sem link')}</span>
+              </div>
             </div>
           ))}
 
@@ -590,6 +719,138 @@ export const AdminView: React.FC<Props> = ({
             <div className="animate-in slide-in-from-bottom-4 duration-500 max-w-4xl w-full">
               <PromoSection title="Banner Superior" data={promoCard} onSave={setPromoCard} icon={Layout} isDarkMode={isDarkMode} />
               <PromoSection title="Banner Rodapé" data={bottomPromoCard} onSave={setBottomPromoCard} icon={Layers} isDarkMode={isDarkMode} />
+            </div>
+          )}
+
+          {tab === 'settings' && (
+            <div className="animate-in slide-in-from-bottom-4 duration-500 max-w-4xl w-full space-y-6">
+              {feedbackMessage && (
+                <div className={`p-4 rounded-xl text-xs font-bold flex items-center gap-3 animate-in fade-in duration-300 ${
+                  feedbackMessage.type === 'success' ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30' : 'bg-red-500/20 text-red-300 border border-red-500/30'
+                }`}>
+                  {feedbackMessage.type === 'success' ? <CheckCircle2 size={18} className="text-emerald-400 shrink-0" /> : <Info size={18} className="text-red-400 shrink-0" />}
+                  <span>{feedbackMessage.text}</span>
+                </div>
+              )}
+
+              <div className={`p-6 md:p-8 rounded-2xl border ${isDarkMode ? 'border-zinc-800 bg-zinc-900/40' : 'border-zinc-200 bg-white shadow-sm'} space-y-6`}>
+                <div className="flex items-center justify-between border-b pb-5 border-zinc-800/40">
+                  <div className="flex items-center gap-3">
+                    <div className={`p-3 rounded-2xl ${isDarkMode ? 'bg-violet-600/20 text-violet-400' : 'bg-violet-50 text-violet-600'}`}>
+                      <Send size={22} />
+                    </div>
+                    <div>
+                      <h3 className={`font-black text-sm uppercase tracking-widest ${isDarkMode ? 'text-white' : 'text-zinc-900'}`}>
+                        Link Geral do Telegram
+                      </h3>
+                      <p className="text-[10px] text-zinc-500 font-bold uppercase tracking-widest mt-0.5">
+                        Configuração global padrão para todas as pastas e pacotes
+                      </p>
+                    </div>
+                  </div>
+
+                  {globalTelegramLink ? (
+                    <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[9px] font-black tracking-widest bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                      CONFIGURADO
+                    </span>
+                  ) : (
+                    <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[9px] font-black tracking-widest bg-zinc-800 text-zinc-400">
+                      NÃO CONFIGURADO
+                    </span>
+                  )}
+                </div>
+
+                <div className="grid md:grid-cols-2 gap-6">
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black text-zinc-500 uppercase tracking-widest flex items-center gap-1.5">
+                      <Link size={12} /> LINK DO TELEGRAM (CANAL / USUÁRIO)
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="https://t.me/seu_canal_ou_usuario"
+                      className={`w-full border rounded-xl px-5 py-4 outline-none text-xs font-black transition-all ${
+                        isDarkMode ? 'bg-zinc-950 border-zinc-800 text-white focus:border-violet-600' : 'bg-white border-zinc-200 text-zinc-900 focus:border-violet-600'
+                      }`}
+                      value={globalTelegramLink}
+                      onChange={(e) => setGlobalTelegramLink(e.target.value)}
+                    />
+                    <p className="text-[9px] text-zinc-500 font-medium ml-1">
+                      Exemplo: <span className="font-mono text-violet-400">https://t.me/seucanal</span> ou <span className="font-mono text-violet-400">https://t.me/seunome</span>
+                    </p>
+                  </div>
+
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black text-zinc-500 uppercase tracking-widest flex items-center gap-1.5">
+                      <MousePointer2 size={12} /> TEXTO PADRÃO DO BOTÃO TELEGRAM
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="DM TELEGRAM"
+                      className={`w-full border rounded-xl px-5 py-4 outline-none text-xs font-black transition-all ${
+                        isDarkMode ? 'bg-zinc-950 border-zinc-800 text-white focus:border-violet-600' : 'bg-white border-zinc-200 text-zinc-900 focus:border-violet-600'
+                      }`}
+                      value={globalTelegramButtonText}
+                      onChange={(e) => setGlobalTelegramButtonText(e.target.value)}
+                    />
+                    <p className="text-[9px] text-zinc-500 font-medium ml-1">
+                      Texto do botão (Ex: <span className="font-bold text-zinc-400">DM TELEGRAM</span> ou <span className="font-bold text-zinc-400">BUY ALL PACK</span>)
+                    </p>
+                  </div>
+                </div>
+
+                {/* Botões de Ação */}
+                <div className="flex flex-col sm:flex-row gap-3 pt-4 border-t border-zinc-800/40">
+                  <button
+                    onClick={handleSaveGlobalTelegram}
+                    disabled={isSavingGlobal}
+                    className="flex-1 flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-500 text-white px-6 py-4 rounded-xl font-black text-xs uppercase tracking-widest shadow-xl shadow-emerald-600/20 transition-all active:scale-[0.98] disabled:opacity-50"
+                  >
+                    {isSavingGlobal ? (
+                      <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                    ) : (
+                      <Sparkles size={16} />
+                    )}
+                    Salvar como Padrão Geral
+                  </button>
+
+                  <button
+                    onClick={handleApplyToAllPacks}
+                    disabled={isApplyingAll || !globalTelegramLink.trim()}
+                    className="flex-1 flex items-center justify-center gap-2 bg-violet-600 hover:bg-violet-500 text-white px-6 py-4 rounded-xl font-black text-xs uppercase tracking-widest shadow-xl shadow-violet-600/20 transition-all active:scale-[0.98] disabled:opacity-50"
+                    title="Atualiza o link em todos os vídeos e fotos existentes no banco de dados"
+                  >
+                    {isApplyingAll ? (
+                      <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                    ) : (
+                      <Zap size={16} />
+                    )}
+                    ⚡ Aplicar a Todas as Pastas Existentes ({(videos?.length || 0) + (photos?.length || 0)} packs)
+                  </button>
+                </div>
+              </div>
+
+              {/* Guia explicativo */}
+              <div className={`p-6 rounded-2xl border ${isDarkMode ? 'border-zinc-800/60 bg-zinc-950/40' : 'border-zinc-200 bg-zinc-50'} space-y-3`}>
+                <div className="flex items-center gap-2 text-violet-500">
+                  <Info size={16} />
+                  <h4 className="text-xs font-black uppercase tracking-wider">Como funciona o Link Geral do Telegram</h4>
+                </div>
+                <ul className="text-xs space-y-2.5 text-zinc-400 leading-relaxed font-medium">
+                  <li className="flex items-start gap-2">
+                    <span className="text-violet-500 font-bold">•</span>
+                    <span><strong className={isDarkMode ? 'text-white' : 'text-zinc-900'}>Padrão Automático:</strong> Ao salvar o link aqui, qualquer pack (vídeo ou foto) novo ou existente que não tiver um link individual usará este link geral automaticamente.</span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <span className="text-violet-500 font-bold">•</span>
+                    <span><strong className={isDarkMode ? 'text-white' : 'text-zinc-900'}>Links Individuais Mantidos:</strong> Se um pack específico tiver seu próprio link configurado na edição dele, esse link específico terá prioridade para aquele pack.</span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <span className="text-violet-500 font-bold">•</span>
+                    <span><strong className={isDarkMode ? 'text-white' : 'text-zinc-900'}>Atualização em Lote:</strong> O botão <strong className="text-violet-400">"⚡ Aplicar a Todas as Pastas Existentes"</strong> copia este link geral para todos os pacotes salvos no banco de dados de uma vez só.</span>
+                  </li>
+                </ul>
+              </div>
             </div>
           )}
         </div>
@@ -726,11 +987,17 @@ export const AdminView: React.FC<Props> = ({
                     <div className="grid grid-cols-2 gap-4">
                       <div className="space-y-1">
                         <label className="text-[9px] font-black text-zinc-500 uppercase tracking-widest italic">Link Compra</label>
-                        <input type="text" className={`w-full border rounded-xl px-4 py-3 outline-none text-[10px] ${isDarkMode ? 'bg-zinc-950 border-zinc-800 text-white focus:border-violet-600' : 'bg-white border-zinc-200 text-zinc-900 focus:border-violet-600'}`} value={formVideo.buyLink} onChange={(e) => setFormVideo(p => ({ ...p, buyLink: e.target.value }))} />
+                        <input type="text" placeholder="https://..." className={`w-full border rounded-xl px-4 py-3 outline-none text-[10px] ${isDarkMode ? 'bg-zinc-950 border-zinc-800 text-white focus:border-violet-600' : 'bg-white border-zinc-200 text-zinc-900 focus:border-violet-600'}`} value={formVideo.buyLink} onChange={(e) => setFormVideo(p => ({ ...p, buyLink: e.target.value }))} />
                       </div>
                       <div className="space-y-1">
-                        <label className="text-[9px] font-black text-zinc-500 uppercase tracking-widest italic">Link Telegram</label>
-                        <input type="text" className={`w-full border rounded-xl px-4 py-3 outline-none text-[10px] ${isDarkMode ? 'bg-zinc-950 border-zinc-800 text-white focus:border-violet-600' : 'bg-white border-zinc-200 text-zinc-900 focus:border-violet-600'}`} value={formVideo.telegramLink} onChange={(e) => setFormVideo(p => ({ ...p, telegramLink: e.target.value }))} />
+                        <label className="text-[9px] font-black text-zinc-500 uppercase tracking-widest italic">Link Telegram (Individual)</label>
+                        <input
+                          type="text"
+                          placeholder={globalTelegramLink ? `Padrão: ${globalTelegramLink}` : 'https://t.me/...'}
+                          className={`w-full border rounded-xl px-4 py-3 outline-none text-[10px] ${isDarkMode ? 'bg-zinc-950 border-zinc-800 text-white focus:border-violet-600' : 'bg-white border-zinc-200 text-zinc-900 focus:border-violet-600'}`}
+                          value={formVideo.telegramLink}
+                          onChange={(e) => setFormVideo(p => ({ ...p, telegramLink: e.target.value }))}
+                        />
                       </div>
                     </div>
                     <div className="grid grid-cols-2 gap-4">
@@ -743,6 +1010,72 @@ export const AdminView: React.FC<Props> = ({
                         <input type="text" className={`w-full border rounded-xl px-4 py-3 outline-none text-[10px] ${isDarkMode ? 'bg-zinc-950 border-zinc-800 text-white focus:border-violet-600' : 'bg-white border-zinc-200 text-zinc-900 focus:border-violet-600'}`} value={formVideo.telegramButtonText} onChange={(e) => setFormVideo(p => ({ ...p, telegramButtonText: e.target.value }))} />
                       </div>
                     </div>
+                    <p className="text-[9px] text-zinc-400 font-medium ml-1">
+                      * Deixe o Link Telegram em branco para usar o Link Geral: <span className="font-bold text-violet-400">{globalTelegramLink || 'Nenhum definido'}</span>
+                    </p>
+                  </div>
+                </div>
+              )}
+
+              {tab === 'photos' && (
+                <div className="grid md:grid-cols-2 gap-8">
+                  <div className="space-y-6">
+                    <div className="space-y-2">
+                      <label className="text-[10px] font-black text-zinc-500 uppercase tracking-widest italic ml-1">Nome da Foto / Pacote</label>
+                      <input type="text" placeholder="Título da Foto" className={`w-full border rounded-xl px-5 py-4 outline-none text-xs font-black ${isDarkMode ? 'bg-zinc-950 border-zinc-800 text-white focus:border-violet-600' : 'bg-white border-zinc-200 text-zinc-900 focus:border-violet-600'}`} value={formPhoto.title} onChange={(e) => setFormPhoto(p => ({ ...p, title: e.target.value }))} />
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-[10px] font-black text-zinc-500 uppercase tracking-widest italic ml-1">Preço (Ex: $15)</label>
+                      <input type="text" placeholder="Preço" className={`w-full border rounded-xl px-5 py-4 outline-none text-xs font-black ${isDarkMode ? 'bg-zinc-950 border-zinc-800 text-white focus:border-violet-600' : 'bg-white border-zinc-200 text-zinc-900 focus:border-violet-600'}`} value={formPhoto.price} onChange={(e) => setFormPhoto(p => ({ ...p, price: e.target.value }))} />
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-[10px] font-black text-zinc-500 uppercase tracking-widest italic ml-1">Foto (Upload)</label>
+                      <div className="relative">
+                        <input
+                          type="text"
+                          readOnly
+                          placeholder="Clique no ícone para Upload"
+                          className={`w-full border rounded-xl px-5 py-4 outline-none text-xs pr-14 cursor-default ${isDarkMode ? 'bg-zinc-950 border-zinc-800 text-white focus:border-violet-600' : 'bg-white border-zinc-200 text-zinc-900 focus:border-violet-600'}`}
+                          value={formPhoto.photoUrl}
+                        />
+                        <label className="absolute right-2 top-2 p-2 bg-violet-600 text-white rounded-xl transition-all cursor-pointer hover:bg-violet-500 shadow-lg shadow-violet-600/20"><FileUp size={20} /><input type="file" className="hidden" accept="image/*" onChange={(e) => handleFileUpload(e, 'photo-url')} /></label>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="space-y-6">
+                    <div className="space-y-2">
+                      <label className="text-[10px] font-black text-zinc-500 uppercase tracking-widest italic ml-1">Descrição (Opcional)</label>
+                      <textarea rows={3} placeholder="Descrição da foto ou conteúdo..." className={`w-full border rounded-xl px-5 py-4 outline-none text-xs transition-all resize-none ${isDarkMode ? 'bg-zinc-950 border-zinc-800 text-white focus:border-violet-600' : 'bg-white border-zinc-200 text-zinc-900 focus:border-violet-600'}`} value={formPhoto.description} onChange={(e) => setFormPhoto(p => ({ ...p, description: e.target.value }))} />
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-1">
+                        <label className="text-[9px] font-black text-zinc-500 uppercase tracking-widest italic">Link Compra (Opcional)</label>
+                        <input type="text" placeholder="https://..." className={`w-full border rounded-xl px-4 py-3 outline-none text-[10px] ${isDarkMode ? 'bg-zinc-950 border-zinc-800 text-white focus:border-violet-600' : 'bg-white border-zinc-200 text-zinc-900 focus:border-violet-600'}`} value={formPhoto.buyLink} onChange={(e) => setFormPhoto(p => ({ ...p, buyLink: e.target.value }))} />
+                      </div>
+                      <div className="space-y-1">
+                        <label className="text-[9px] font-black text-zinc-500 uppercase tracking-widest italic">Link Telegram (Individual)</label>
+                        <input
+                          type="text"
+                          placeholder={globalTelegramLink ? `Padrão: ${globalTelegramLink}` : 'https://t.me/...'}
+                          className={`w-full border rounded-xl px-4 py-3 outline-none text-[10px] ${isDarkMode ? 'bg-zinc-950 border-zinc-800 text-white focus:border-violet-600' : 'bg-white border-zinc-200 text-zinc-900 focus:border-violet-600'}`}
+                          value={formPhoto.telegramLink}
+                          onChange={(e) => setFormPhoto(p => ({ ...p, telegramLink: e.target.value }))}
+                        />
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-1">
+                        <label className="text-[9px] font-black text-zinc-500 uppercase tracking-widest italic">Texto Botão Compra</label>
+                        <input type="text" className={`w-full border rounded-xl px-4 py-3 outline-none text-[10px] ${isDarkMode ? 'bg-zinc-950 border-zinc-800 text-white focus:border-violet-600' : 'bg-white border-zinc-200 text-zinc-900 focus:border-violet-600'}`} value={formPhoto.buyButtonText} onChange={(e) => setFormPhoto(p => ({ ...p, buyButtonText: e.target.value }))} />
+                      </div>
+                      <div className="space-y-1">
+                        <label className="text-[9px] font-black text-zinc-500 uppercase tracking-widest italic">Texto Botão Telegram</label>
+                        <input type="text" className={`w-full border rounded-xl px-4 py-3 outline-none text-[10px] ${isDarkMode ? 'bg-zinc-950 border-zinc-800 text-white focus:border-violet-600' : 'bg-white border-zinc-200 text-zinc-900 focus:border-violet-600'}`} value={formPhoto.telegramButtonText} onChange={(e) => setFormPhoto(p => ({ ...p, telegramButtonText: e.target.value }))} />
+                      </div>
+                    </div>
+                    <p className="text-[9px] text-zinc-400 font-medium ml-1">
+                      * Deixe o Link Telegram em branco para usar o Link Geral: <span className="font-bold text-violet-400">{globalTelegramLink || 'Nenhum definido'}</span>
+                    </p>
                   </div>
                 </div>
               )}

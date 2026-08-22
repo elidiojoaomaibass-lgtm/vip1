@@ -1,5 +1,5 @@
 
-import { Banner, VideoCard, PromoCard, Notice, PhotoCard } from '../types';
+import { Banner, VideoCard, PromoCard, Notice, PhotoCard, GlobalSettings } from '../types';
 import { supabase } from './supabase';
 import { uploadService } from './storageUpload';
 
@@ -9,12 +9,17 @@ const PHOTOS_KEY = 'vh_photos';
 const PROMO_KEY = 'vh_promo';
 const BOTTOM_PROMO_KEY = 'vh_bottom_promo';
 const NOTICES_KEY = 'vh_notices';
+const SETTINGS_KEY = 'vh_settings';
 
 // Dados vazios para produção
 const DEFAULT_BANNERS: Banner[] = [];
 const DEFAULT_VIDEOS: VideoCard[] = [];
 const DEFAULT_PHOTOS: PhotoCard[] = [];
 const DEFAULT_NOTICES: Notice[] = [];
+const DEFAULT_SETTINGS: GlobalSettings = {
+  globalTelegramLink: '',
+  globalTelegramButtonText: 'DM TELEGRAM'
+};
 
 const DEFAULT_PROMO: PromoCard = {
   title: '',
@@ -475,6 +480,65 @@ export const storageService = {
       return { synced: true };
     }
     return { synced: false, error: 'Supabase client not initialized' };
+  },
+
+  // ========== GLOBAL SETTINGS ==========
+  getGlobalSettings: async (): Promise<GlobalSettings> => {
+    try {
+      const stored = localStorage.getItem(SETTINGS_KEY);
+      if (stored) {
+        return { ...DEFAULT_SETTINGS, ...JSON.parse(stored) };
+      }
+    } catch (e) { }
+    return DEFAULT_SETTINGS;
+  },
+
+  saveGlobalSettings: async (settings: GlobalSettings): Promise<{ synced: boolean; error?: string }> => {
+    safeSaveLocal(SETTINGS_KEY, settings);
+    return { synced: true };
+  },
+
+  applyGlobalTelegramToAllPacks: async (telegramLink: string, telegramButtonText?: string): Promise<{ synced: boolean; error?: string }> => {
+    try {
+      // Salva a configuração global
+      const newSettings: GlobalSettings = {
+        globalTelegramLink: telegramLink,
+        globalTelegramButtonText: telegramButtonText || 'DM TELEGRAM'
+      };
+      safeSaveLocal(SETTINGS_KEY, newSettings);
+
+      // Carrega os vídeos e fotos atuais
+      const currentVideos = await storageService.getVideos();
+      const currentPhotos = await storageService.getPhotos();
+
+      // Atualiza todos os vídeos com o novo link
+      const updatedVideos = currentVideos.map(v => ({
+        ...v,
+        telegramLink: telegramLink,
+        ...(telegramButtonText ? { telegramButtonText } : {})
+      }));
+
+      // Atualiza todas as fotos com o novo link
+      const updatedPhotos = currentPhotos.map(p => ({
+        ...p,
+        telegramLink: telegramLink,
+        ...(telegramButtonText ? { telegramButtonText } : {})
+      }));
+
+      // Salva no banco de dados e localstorage
+      const [resVideos, resPhotos] = await Promise.all([
+        storageService.saveVideos(updatedVideos),
+        storageService.savePhotos(updatedPhotos)
+      ]);
+
+      const synced = resVideos.synced && resPhotos.synced;
+      const error = resVideos.error || resPhotos.error;
+
+      return { synced, error };
+    } catch (err: any) {
+      console.error("Error applying global telegram to all packs:", err);
+      return { synced: false, error: err.message || 'Unknown error' };
+    }
   },
   // ========== DELETE METHODS ==========
   deleteBanner: async (id: string) => {

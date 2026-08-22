@@ -16,7 +16,7 @@ export interface LoginStep1Result {
 
 export const authService = {
   /**
-   * PASSO 1: Login com email e senha → Envia código por email
+   * Login direto com email e senha (sem 2FA)
    */
   loginStep1: async (email: string, password: string): Promise<LoginStep1Result> => {
     if (!supabase) {
@@ -24,7 +24,7 @@ export const authService = {
     }
 
     try {
-      // Primeiro: validar se email e senha estão corretos
+      // Validar email e senha
       const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
         email,
         password
@@ -52,21 +52,11 @@ export const authService = {
         return { requiresTwoFactor: false, error: 'Acesso não autorizado. Este usuário não é um administrador.' };
       }
 
-      // Enviar código OTP usando o serviço customizado ANTES de fazer logout (para o RLS permitir)
-      const { error: otpError } = await twoFactorService.sendCode(email, authData.user.id);
-
-      // Credenciais válidas e código gerado! Agora fazer logout temporário
-      await supabase.auth.signOut();
-
-      if (otpError) {
-        console.error('OTP error:', otpError);
-        return { requiresTwoFactor: false, error: 'Erro ao enviar código de verificação' };
-      }
-
-      // Sucesso! Código enviado por email
+      // Login completo — sem 2FA
       return {
-        requiresTwoFactor: true,
-        email: email
+        requiresTwoFactor: false,
+        userId: authData.user.id,
+        email: authData.user.email
       };
     } catch (err: any) {
       console.error('Login error:', err);

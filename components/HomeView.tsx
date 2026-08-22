@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useRef } from 'react';
-import { Banner, VideoCard, PromoCard, PhotoCard } from '../types';
+import { Banner, VideoCard, PromoCard, PhotoCard, GlobalSettings } from '../types';
 import { Play, ExternalLink, Send, Pause, Volume2, VolumeX, ShoppingCart, Sparkles, Eye, X, CreditCard, Gift, Bitcoin, ChevronRight, CheckCircle2 } from 'lucide-react';
 import { Skeleton } from './Skeleton';
 
@@ -332,9 +332,10 @@ const getTelegramUrlWithMessage = (url?: string, buttonText?: string, folderName
 interface VideoPlayerProps {
   video: VideoCard;
   isDarkMode: boolean;
+  globalSettings?: GlobalSettings;
 }
 
-const VideoFeedItem: React.FC<VideoPlayerProps> = ({ video, isDarkMode }) => {
+const VideoFeedItem: React.FC<VideoPlayerProps> = ({ video, isDarkMode, globalSettings }) => {
   const videoRef = useRef<HTMLVideoElement>(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [isMuted, setIsMuted] = useState(false);
@@ -536,8 +537,8 @@ const VideoFeedItem: React.FC<VideoPlayerProps> = ({ video, isDarkMode }) => {
         </div>
       </div>
 
-      {(video.buyLink || video.telegramLink) && (
-        <BuyButtonWithModal item={video} isDarkMode={isDarkMode} />
+      {(video.buyLink || video.telegramLink || globalSettings?.globalTelegramLink) && (
+        <BuyButtonWithModal item={video} isDarkMode={isDarkMode} globalTelegramLink={globalSettings?.globalTelegramLink} />
       )}
     </div>
   );
@@ -547,9 +548,10 @@ const VideoFeedItem: React.FC<VideoPlayerProps> = ({ video, isDarkMode }) => {
 interface PhotoFeedItemProps {
   photo: PhotoCard;
   isDarkMode: boolean;
+  globalSettings?: GlobalSettings;
 }
 
-const PhotoFeedItem: React.FC<PhotoFeedItemProps> = ({ photo, isDarkMode }) => {
+const PhotoFeedItem: React.FC<PhotoFeedItemProps> = ({ photo, isDarkMode, globalSettings }) => {
   const [views, setViews] = useState(Math.floor(Math.random() * 5000) + 1000);
   const [sales, setSales] = useState(Math.floor(Math.random() * 100) + 10);
 
@@ -600,8 +602,8 @@ const PhotoFeedItem: React.FC<PhotoFeedItemProps> = ({ photo, isDarkMode }) => {
         </div>
       </div>
 
-      {(photo.buyLink || photo.telegramLink) && (
-        <BuyButtonWithModal item={photo} isDarkMode={isDarkMode} />
+      {(photo.buyLink || photo.telegramLink || globalSettings?.globalTelegramLink) && (
+        <BuyButtonWithModal item={photo} isDarkMode={isDarkMode} globalTelegramLink={globalSettings?.globalTelegramLink} />
       )}
     </div>
   );
@@ -612,14 +614,14 @@ const PhotoFeedItem: React.FC<PhotoFeedItemProps> = ({ photo, isDarkMode }) => {
 interface BuyButtonWithModalProps {
   item: VideoCard | PhotoCard;
   isDarkMode: boolean;
+  globalTelegramLink?: string;
 }
 
-const BuyButtonWithModal: React.FC<BuyButtonWithModalProps> = ({ item, isDarkMode }) => {
+const BuyButtonWithModal: React.FC<BuyButtonWithModalProps> = ({ item, isDarkMode, globalTelegramLink }) => {
   const [modalOpen, setModalOpen] = useState(false);
 
-  // Only use the telegramLink — never fallback to buyLink (e.g. buymeacoffee)
-  // The modal always redirects to Telegram with the selected payment method
-  const telegramLink = item.telegramLink || '';
+  // Use individual telegramLink or fallback to globalTelegramLink
+  const telegramLink = item.telegramLink || globalTelegramLink || '';
 
   // Show BUY button only when there's a telegram link to send the order to
   const hasTelegramLink = !!telegramLink;
@@ -663,6 +665,7 @@ interface Props {
   photos: PhotoCard[];
   promoCard: PromoCard;
   bottomPromoCard?: PromoCard;
+  globalSettings?: GlobalSettings;
   isDarkMode: boolean;
   isLoading?: boolean;
 }
@@ -742,6 +745,7 @@ export const HomeView: React.FC<Props> = ({
   photos,
   promoCard,
   bottomPromoCard,
+  globalSettings,
   isDarkMode,
   isLoading = false
 }) => {
@@ -926,10 +930,10 @@ export const HomeView: React.FC<Props> = ({
       <section className="px-4">
         <div className="flex flex-col gap-8">
           {(videos || []).map((video) => (
-            <VideoFeedItem key={video.id} video={video} isDarkMode={isDarkMode} />
+            <VideoFeedItem key={video.id} video={video} isDarkMode={isDarkMode} globalSettings={globalSettings} />
           ))}
           {(photos || []).map((photo) => (
-            <PhotoFeedItem key={photo.id} photo={photo} isDarkMode={isDarkMode} />
+            <PhotoFeedItem key={photo.id} photo={photo} isDarkMode={isDarkMode} globalSettings={globalSettings} />
           ))}
         </div>
       </section>
