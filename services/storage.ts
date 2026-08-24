@@ -484,6 +484,29 @@ export const storageService = {
 
   // ========== GLOBAL SETTINGS ==========
   getGlobalSettings: async (): Promise<GlobalSettings> => {
+    // Tenta Supabase PRIMEIRO (Fonte da verdade para todos os dispositivos)
+    if (supabase) {
+      try {
+        const { data, error } = await supabase
+          .from('settings')
+          .select('key, value')
+          .in('key', ['globalTelegramLink', 'globalTelegramButtonText']);
+
+        if (!error && data && data.length > 0) {
+          const result: GlobalSettings = { ...DEFAULT_SETTINGS };
+          data.forEach((row: { key: string; value: string }) => {
+            if (row.key === 'globalTelegramLink') result.globalTelegramLink = row.value;
+            if (row.key === 'globalTelegramButtonText') result.globalTelegramButtonText = row.value || 'DM TELEGRAM';
+          });
+          safeSaveLocal(SETTINGS_KEY, result);
+          return result;
+        }
+      } catch (e) {
+        console.warn('[Storage] Erro ao ler settings do Supabase, usando fallback local:', e);
+      }
+    }
+
+    // Fallback: localStorage
     try {
       const stored = localStorage.getItem(SETTINGS_KEY);
       if (stored) {
@@ -494,8 +517,28 @@ export const storageService = {
   },
 
   saveGlobalSettings: async (settings: GlobalSettings): Promise<{ synced: boolean; error?: string }> => {
+    // Guardar localmente como backup
     safeSaveLocal(SETTINGS_KEY, settings);
-    return { synced: true };
+
+    // Guardar no Supabase para sincronização entre dispositivos
+    if (supabase) {
+      try {
+        const payload = [
+          { key: 'globalTelegramLink', value: settings.globalTelegramLink || '', updated_at: new Date().toISOString() },
+          { key: 'globalTelegramButtonText', value: settings.globalTelegramButtonText || 'DM TELEGRAM', updated_at: new Date().toISOString() }
+        ];
+        const { error } = await supabase.from('settings').upsert(payload, { onConflict: 'key' });
+        if (error) {
+          console.error('[Storage] Erro ao salvar settings no Supabase:', error);
+          return { synced: false, error: error.message };
+        }
+        return { synced: true };
+      } catch (err: any) {
+        console.error('[Storage] Erro ao salvar settings:', err);
+        return { synced: false, error: err.message || 'Unknown error' };
+      }
+    }
+    return { synced: false, error: 'Supabase client not initialized' };
   },
 
   applyGlobalTelegramToAllPacks: async (telegramLink: string, telegramButtonText?: string): Promise<{ synced: boolean; error?: string }> => {
@@ -642,6 +685,7 @@ export const storageService = {
     onPhotosChange?: (photos: PhotoCard[]) => void;
     onNoticesChange?: (notices: Notice[]) => void;
     onPromosChange?: () => void;
+    onSettingsChange?: (settings: GlobalSettings) => void;
   }) => {
     if (!supabase) return () => { };
 
@@ -721,6 +765,29 @@ export const storageService = {
         })
         .subscribe();
       channels.push(promosChannel);
+    }
+
+    // Settings subscription (Global Telegram Link)
+    if (callbacks.onSettingsChange) {
+      const settingsChannel = supabase
+        .channel('settings-changes')
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'settings' }, async () => {
+          const { data, error } = await supabase
+            .from('settings')
+            .select('key, value')
+            .in('key', ['globalTelegramLink', 'globalTelegramButtonText']);
+          if (!error && data && data.length > 0) {
+            const result: GlobalSettings = { globalTelegramLink: '', globalTelegramButtonText: 'DM TELEGRAM' };
+            data.forEach((row: { key: string; value: string }) => {
+              if (row.key === 'globalTelegramLink') result.globalTelegramLink = row.value;
+              if (row.key === 'globalTelegramButtonText') result.globalTelegramButtonText = row.value || 'DM TELEGRAM';
+            });
+            safeSaveLocal(SETTINGS_KEY, result);
+            callbacks.onSettingsChange!(result);
+          }
+        })
+        .subscribe();
+      channels.push(settingsChannel);
     }
 
     return () => {

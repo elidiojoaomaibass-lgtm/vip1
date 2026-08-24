@@ -99,6 +99,9 @@ const App: React.FC = () => {
         ]);
         setPromoCard(pTop);
         setBottomPromoCard(pBottom);
+      },
+      onSettingsChange: (newSettings) => {
+        setGlobalSettings(newSettings);
       }
     });
 
